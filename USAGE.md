@@ -29,8 +29,8 @@ const greetTool = new Tool({
 
 // Create agent
 const agent = new Agent({
-  model: 'gpt-4',
-  apiKey: 'your-api-key',
+  model: 'anthropic/claude-3-haiku', // Any OpenRouter model
+  apiKey: process.env.OPENROUTER_API_KEY,
   instructions: 'You are a helpful assistant.',
   tools: [greetTool]
 })
@@ -46,8 +46,8 @@ console.log(response.content) // Output: Hello, John!
 import { Agent, createChatInterface } from '@yourname/ai-agent-toolkit'
 
 const agent = new Agent({
-  model: 'gpt-4',
-  apiKey: 'your-api-key',
+  model: 'qwen/qwen3-coder:free', // Free model on OpenRouter
+  apiKey: process.env.OPENROUTER_API_KEY,
   instructions: 'You are a helpful assistant.',
   tools: [],
   verbose: true
@@ -152,9 +152,15 @@ Loads conversation history from JSON file.
 ## Environment Variables
 
 ```env
-# OpenAI API Key
-OPENAI_API_KEY=your_openai_key
-
-# OpenRouter API Key (alternative)
+# OpenRouter API Key (Recommended)
 OPENROUTER_API_KEY=your_openrouter_key
+
+# OpenAI API Key (Alternative)
+OPENAI_API_KEY=your_openai_key
 ```
+
+### Why OpenRouter?
+- Single API key for 50+ models (GPT-4, Claude, Gemini, etc.)
+- Up to 50% cost savings compared to direct APIs
+- Free models available for testing
+- Same OpenAI-compatible format

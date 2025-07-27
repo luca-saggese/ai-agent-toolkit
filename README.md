@@ -1,10 +1,11 @@
 # AI Agent Toolkit
 
-Un toolkit completo per creare agenti AI con tool calling, compatibile con l'interfaccia `@openai/agents`.
+Un toolkit completo per creare agenti AI con tool calling, compatibile con l'interfaccia `@openai/agents`. **Funziona principalmente con OpenRouter** per accesso a modelli multipli con una singola API key.
 
 ## 🚀 Caratteristiche
 
 - **Compatibile con @openai/agents**: Segue l'interfaccia standard per agenti AI
+- **OpenRouter Ready**: Ottimizzato per OpenRouter con supporto per modelli multipli
 - **Tool System Avanzato**: Supporto per tools con validazione Zod
 - **Chat Interattiva**: Interfacce ready-to-use per console
 - **NPM Package**: Utilizzabile come dipendenza in altri progetti
@@ -29,8 +30,26 @@ npm install
 
 # Configura le variabili d'ambiente
 cp .env.example .env
-# Modifica .env con le tue API keys
+# Modifica .env con la tua OpenRouter API key
 ```
+
+## 🔧 Configurazione
+
+### OpenRouter (Raccomandato)
+```env
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+```
+
+### OpenAI (Alternativa)
+```env
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+> **💡 Perché OpenRouter?**
+> - Accesso a modelli multipli (GPT-4, Claude, Gemini, etc.) con una singola API key
+> - Costi ridotti rispetto alle API dirette
+> - Stesso formato API di OpenAI
+> - Failover automatico tra modelli
 
 ## 🔧 Uso Base
 
@@ -56,8 +75,8 @@ const myTool = new Tool({
 
 // Crea l'agent
 const agent = new Agent({
-  model: 'gpt-4',
-  apiKey: process.env.OPENAI_API_KEY,
+  model: 'qwen/qwen3-coder:free', // Modello gratuito su OpenRouter
+  apiKey: process.env.OPENROUTER_API_KEY,
   instructions: 'Sei un assistente utile.',
   tools: [myTool]
 })
@@ -72,7 +91,12 @@ console.log(response.content)
 ```javascript
 import { Agent, createChatInterface } from 'ai-agent-toolkit'
 
-const agent = new Agent({ /* configurazione */ })
+const agent = new Agent({
+  model: 'anthropic/claude-3-haiku', // Claude via OpenRouter
+  apiKey: process.env.OPENROUTER_API_KEY,
+  instructions: 'Sei un assistente AI utile e amichevole.',
+  verbose: true
+})
 
 // Avvia chat interattiva
 createChatInterface(agent, {
@@ -80,6 +104,26 @@ createChatInterface(agent, {
   prompt: 'Tu: '
 })
 ```
+
+## 🎯 Modelli Supportati
+
+Tramite **OpenRouter**, puoi usare tutti questi modelli:
+
+### Gratuiti
+- `qwen/qwen3-coder:free` - Ottimo per coding
+- `microsoft/phi-3-mini-128k-instruct:free` - Veloce e leggero
+- `mistralai/mistral-7b-instruct:free` - Bilanciato
+
+### A Pagamento (Costi Ridotti)
+- `anthropic/claude-3-haiku` - Veloce ed economico
+- `openai/gpt-4o-mini` - GPT-4 economico
+- `google/gemini-pro` - Google Gemini
+- `anthropic/claude-3-sonnet` - Claude bilanciato
+- `openai/gpt-4` - GPT-4 completo
+
+### Enterprise
+- `anthropic/claude-3-opus` - Claude più potente
+- `openai/gpt-4-turbo` - GPT-4 avanzato
 
 ## 🛠 Tools Disponibili
 
@@ -150,7 +194,7 @@ La classe `Agent` è compatibile con l'interfaccia `@openai/agents` e supporta:
 ```javascript
 // Inizializzazione con options object
 const agent = new Agent({
-  model: 'qwen/qwen3-coder:free',
+  model: 'anthropic/claude-3-haiku', // Qualsiasi modello OpenRouter
   apiKey: process.env.OPENROUTER_API_KEY,
   instructions: 'Sei un assistente AI...',
   tools: availableTools,
@@ -205,7 +249,7 @@ const echoTool = new Tool({
 
 ## 🔄 Aggiungere Nuovi Tools
 
-1. **Crea il tool in `functions.js`:**
+1. **Crea il tool:**
 
 ```javascript
 export const myTool = new Tool({
@@ -227,6 +271,21 @@ export const availableTools = [weatherTool, echoTool, calculateTool, myTool]
 
 2. **Il tool sarà automaticamente disponibile nella chat!**
 
+## 🔗 Setup OpenRouter
+
+1. **Registrati su [OpenRouter.ai](https://openrouter.ai)**
+2. **Ottieni la tua API key** dal dashboard
+3. **Aggiungi crediti** (anche solo $5 durano mesi)
+4. **Usa qualsiasi modello** con la stessa API key
+
+### Vantaggi di OpenRouter:
+- ✅ **Una sola API key** per tutti i modelli
+- ✅ **Costi ridotti** fino al 50% rispetto alle API dirette  
+- ✅ **Modelli gratuiti** disponibili per testing
+- ✅ **Failover automatico** se un modello non è disponibile
+- ✅ **Stesso formato** delle API OpenAI
+- ✅ **Rate limiting** migliore
+
 ## 🐛 Debug
 
 Attiva la modalità debug per vedere i dettagli delle chiamate API:
@@ -244,10 +303,26 @@ Questo mostrerà:
 
 ## 📚 Dipendenze
 
-- `openai` - Client OpenAI per API calls
+- `openai` - Client OpenAI (compatibile con OpenRouter)
 - `dotenv` - Gestione variabili d'ambiente
 - `zod` - Validazione schema e type safety
 - `@openai/agents` - Interfaccia standard per agenti AI
+
+## 🌐 API Supportate
+
+### OpenRouter (Raccomandato)
+- **URL**: `https://openrouter.ai/api/v1`
+- **Modelli**: 50+ modelli disponibili
+- **Costi**: Ridotti fino al 50%
+- **Setup**: Una sola API key
+
+### OpenAI (Supporto diretto)
+- **URL**: `https://api.openai.com/v1`
+- **Modelli**: GPT-3.5, GPT-4 serie
+- **Costi**: Listino OpenAI standard
+
+### Altri Provider
+Il toolkit è compatibile con qualsiasi API che segue il formato OpenAI.
 
 ## 🤝 Contribuire
 
