@@ -1,17 +1,24 @@
-# SimpleAgent - AI Chat Agent con Tools
+# AI Agent Toolkit
 
-Un agente AI interattivo compatibile con l'interfaccia `@openai/agents` che supporta tool calling per operazioni specifiche.
+Un toolkit completo per creare agenti AI con tool calling, compatibile con l'interfaccia `@openai/agents`.
 
 ## 🚀 Caratteristiche
 
 - **Compatibile con @openai/agents**: Segue l'interfaccia standard per agenti AI
 - **Tool System Avanzato**: Supporto per tools con validazione Zod
-- **Chat Interattiva**: Interfaccia console user-friendly
-- **Debug Mode**: Modalità debug dettagliata per sviluppo
+- **Chat Interattiva**: Interfacce ready-to-use per console
+- **NPM Package**: Utilizzabile come dipendenza in altri progetti
+- **Debug & Verbose Mode**: Modalità dettagliate per sviluppo
 - **Gestione Errori**: Gestione robusta degli errori nei tool calls
 
 ## 📦 Installazione
 
+### Come pacchetto npm
+```bash
+npm install ai-agent-toolkit
+```
+
+### Sviluppo locale
 ```bash
 # Clona il repository
 git clone <repo-url>
@@ -25,18 +32,53 @@ cp .env.example .env
 # Modifica .env con le tue API keys
 ```
 
-## 🔧 Configurazione
+## 🔧 Uso Base
 
-Crea un file `.env` nella root del progetto:
+### Importa le classi principali
 
-```env
-OPENROUTER_API_KEY=your_openrouter_api_key_here
+```javascript
+import { Agent, Tool } from 'ai-agent-toolkit'
+
+// Crea un tool personalizzato
+const myTool = new Tool({
+  name: 'get_time',
+  description: 'Ottiene l\'ora attuale',
+  parameters: {
+    type: 'object',
+    properties: {
+      timezone: { type: 'string', description: 'Timezone (opzionale)' }
+    }
+  },
+  handler: async ({ timezone = 'UTC' }) => {
+    return new Date().toLocaleString('it-IT', { timeZone: timezone })
+  }
+})
+
+// Crea l'agent
+const agent = new Agent({
+  model: 'gpt-4',
+  apiKey: process.env.OPENAI_API_KEY,
+  instructions: 'Sei un assistente utile.',
+  tools: [myTool]
+})
+
+// Usa l'agent
+const response = await agent.run('Che ore sono?')
+console.log(response.content)
 ```
 
-## 🏃‍♂️ Avvio
+### Chat interattiva con utilities
 
-```bash
-npm start
+```javascript
+import { Agent, createChatInterface } from 'ai-agent-toolkit'
+
+const agent = new Agent({ /* configurazione */ })
+
+// Avvia chat interattiva
+createChatInterface(agent, {
+  welcomeMessage: '🤖 Ciao! Come posso aiutarti?',
+  prompt: 'Tu: '
+})
 ```
 
 ## 🛠 Tools Disponibili

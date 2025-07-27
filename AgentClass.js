@@ -242,6 +242,25 @@ export class Agent {
   }
 
   /**
+   * Esegue una chat interattiva (stream-like)
+   */
+  async *chat(userMessage) {
+    this.addUserMessage(userMessage)
+    
+    let iterations = 0
+    while (iterations < this.maxIterations) {
+      const result = await this.step()
+      iterations++
+      
+      yield result
+      
+      if (result.type === 'response') {
+        break
+      }
+    }
+  }
+
+  /**
    * Resetta la conversazione mantenendo solo il system prompt
    */
   reset() {
@@ -256,88 +275,6 @@ export class Agent {
    */
   getHistory() {
     return [...this.messages]
-  }
-
-  /**
-   * Imposta la cronologia dei messaggi
-   */
-  setHistory(messages) {
-    if (!Array.isArray(messages)) {
-      throw new Error('La cronologia deve essere un array di messaggi')
-    }
-    
-    // Validazione dei messaggi
-    for (const msg of messages) {
-      if (!msg.role || !['system', 'user', 'assistant', 'tool'].includes(msg.role)) {
-        throw new Error(`Ruolo del messaggio non valido: ${msg.role}`)
-      }
-      if (msg.content === undefined && msg.role !== 'assistant') {
-        throw new Error('Il messaggio deve avere un contenuto')
-      }
-    }
-    
-    this.messages = [...messages]
-    
-    // Ricostruisci la mappa dei tools se ci sono tool calls nella cronologia
-    this.toolMap.clear()
-    this.tools.forEach(tool => {
-      this.toolMap.set(tool.name, tool)
-    })
-  }
-
-  /**
-   * Aggiunge messaggi alla cronologia esistente
-   */
-  appendToHistory(messages) {
-    if (!Array.isArray(messages)) {
-      throw new Error('I messaggi devono essere un array')
-    }
-    
-    for (const msg of messages) {
-      if (!msg.role || !['system', 'user', 'assistant', 'tool'].includes(msg.role)) {
-        throw new Error(`Ruolo del messaggio non valido: ${msg.role}`)
-      }
-    }
-    
-    this.messages.push(...messages)
-  }
-
-  /**
-   * Ottiene una versione leggibile della cronologia
-   */
-  getReadableHistory() {
-    return this.messages
-      .filter(msg => msg.role !== 'tool') // Filtra i messaggi dei tools per leggibilità
-      .map(msg => {
-        const role = msg.role === 'user' ? '👤 Utente' : 
-                    msg.role === 'assistant' ? '🤖 Assistant' : 
-                    msg.role === 'system' ? '⚙️ System' : msg.role
-        return `${role}: ${msg.content || '[Tool calls]'}`
-      })
-      .join('\n\n')
-  }
-
-  /**
-   * Ottiene statistiche sulla cronologia
-   */
-  getHistoryStats() {
-    const stats = {
-      total: this.messages.length,
-      user: 0,
-      assistant: 0,
-      system: 0,
-      tool: 0,
-      toolCalls: 0
-    }
-    
-    this.messages.forEach(msg => {
-      stats[msg.role] = (stats[msg.role] || 0) + 1
-      if (msg.tool_calls) {
-        stats.toolCalls += msg.tool_calls.length
-      }
-    })
-    
-    return stats
   }
 
   /**

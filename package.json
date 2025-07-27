@@ -27,6 +27,7 @@
     "start": "node example/index.js",
     "dev": "node example/index.js",
     "example": "node example/index.js",
+    "example:basic": "node example/basic.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "echo \"No build step needed for pure ESM package\"",
     "prepublishOnly": "npm test"

@@ -131,16 +131,6 @@ function handleSpecialCommands(input) {
       console.log('\n🔇 Modalità verbose disattivata')
       return true
       
-    case 'streaming on':
-      agent.setStreaming(true)
-      console.log('\n🌊 Streaming attivato - Vedrai le risposte mentre vengono generate')
-      return true
-      
-    case 'streaming off':
-      agent.setStreaming(false)
-      console.log('\n⏹️ Streaming disattivato - Vedrai le risposte complete alla fine')
-      return true
-      
     case 'stop':
       agent.stop()
       console.log('\n🛑 Comando di stop inviato')
