@@ -1,0 +1,74 @@
+{
+  "name": "@yourname/ai-agent-toolkit",
+  "version": "1.0.0",
+  "description": "A powerful AI agent toolkit compatible with @openai/agents for building conversational AI with tool calling support",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "types": "./src/index.d.ts"
+    },
+    "./Agent": {
+      "import": "./src/Agent.js",
+      "types": "./src/Agent.d.ts"
+    },
+    "./Tool": {
+      "import": "./src/Tool.js",
+      "types": "./src/Tool.d.ts"
+    }
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node example/index.js",
+    "dev": "node example/index.js",
+    "example": "node example/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "echo \"No build step needed for pure ESM package\"",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "openai",
+    "chatbot",
+    "tools",
+    "conversational-ai",
+    "llm",
+    "assistant",
+    "chat",
+    "streaming"
+  ],
+  "author": {
+    "name": "Your Name",
+    "email": "your.email@example.com",
+    "url": "https://github.com/yourusername"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/ai-agent-toolkit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/ai-agent-toolkit/issues"
+  },
+  "homepage": "https://github.com/yourusername/ai-agent-toolkit#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "peerDependencies": {
+    "dotenv": "^16.0.0 || ^17.0.0"
+  },
+  "dependencies": {
+    "openai": "^5.10.2",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@openai/agents": "^0.0.13",
+    "dotenv": "^17.2.1"
+  }
+}
