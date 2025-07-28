@@ -223,7 +223,7 @@ app.post('/v1/chat/completions', async (req, res) => {
 
         const requestId = `chatcmpl-${Date.now()}`
         const created = Math.floor(Date.now() / 1000)
-        
+
         // Helper per inviare chunk
         const sendChunk = (delta, finishReason = null) => {
           const chunk = {
@@ -237,97 +237,131 @@ app.post('/v1/chat/completions', async (req, res) => {
               finish_reason: finishReason
             }]
           }
+          console.log(`📦 Sending chunk: ${JSON.stringify(chunk)}`)
           res.write(`data: ${JSON.stringify(chunk)}\n\n`)
+          res.flushHeaders()  ;
         }
 
         let hasStarted = false
         let pendingContent = ''
+        let streamTimeout = null
 
-        // Gestisci eventi dell'agent per streaming
-        agent.on('assistant_tool_calls', (message) => {
-          // Chunk 1: Inizio messaggio assistant
-          if (!hasStarted) {
-            sendChunk({ role: 'assistant' })
-            hasStarted = true
-          }
-          
-          // Chunk 2: Tool calls
-          sendChunk({
-            tool_calls: message.tool_calls.map(call => ({
-              id: call.id,
-              type: 'function',
-              function: {
-                name: call.function.name,
-                arguments: call.function.arguments
-              }
-            }))
-          })
-          
-          // Chunk 3: Finale con finish_reason
-          sendChunk({}, 'tool_calls')
-          res.write('data: [DONE]\n\n')
-          res.end()
-        })
-
-        agent.on('assistant_message', (message) => {
-          // Chunk 1: Inizio messaggio assistant
-          if (!hasStarted) {
-            sendChunk({ role: 'assistant' })
-            hasStarted = true
-          }
-          
-          // Streaming del contenuto testuale
-          if (message.content) {
-            // Spezza la risposta in chunks per simulare streaming del testo
-            const words = message.content.split(' ')
-            let sentWords = 0
-            
-            const sendWordChunks = () => {
-              if (sentWords >= words.length) {
-                // Chunk finale
-                sendChunk({}, 'stop')
-                res.write('data: [DONE]\n\n')
-                res.end()
-                return
-              }
-              
-              const word = words[sentWords]
-              const content = sentWords === 0 ? word : ' ' + word
-              sentWords++
-              
-              sendChunk({ content })
-              
-              setTimeout(sendWordChunks, 50) // Piccolo delay tra parole
-            }
-            
-            sendWordChunks()
-          } else {
-            // Nessun contenuto, chiudi immediatamente
-            sendChunk({}, 'stop')
+        // Timeout di sicurezza per chiudere lo stream se rimane aperto troppo a lungo
+        const timeoutMs = 60000 // 60 secondi
+        streamTimeout = setTimeout(() => {
+          console.log('⏰ Stream timeout raggiunto, chiudo la connessione')
+          if (!res.headersSent || !res.destroyed) {
+            res.write('data: {"error": "Stream timeout"}\n\n')
             res.write('data: [DONE]\n\n')
             res.end()
           }
+        }, timeoutMs)
+
+        // Helper per pulire il timeout
+        const cleanupAndEnd = (callback) => {
+          if (streamTimeout) {
+            clearTimeout(streamTimeout)
+            streamTimeout = null
+          }
+          if (callback) callback()
+        }
+
+        // Gestisci eventi dell'agent per streaming
+        agent.on('assistant_tool_calls', (message) => {
+          console.log('🛠️ Sending tool calls to stream...')
+
+          // const toolCallsFormatted = message.tool_calls.map((call, index) => ({
+          //   index: index,
+          //   id: call.id,
+          //   type: 'function',
+          //   function: {
+          //     name: call.function.name,
+          //     arguments: call.function.arguments,
+          //     done: true
+          //   }
+          // }))
+          // console.log('toolCallsFormatted', toolCallsFormatted)
+
+          sendChunk({ role: 'assistant', content: 'Lancio il tool ' + message.tool_calls[0].function.name + '... ' })
+
+          // sendChunk({ tool_calls: toolCallsFormatted })
+
+
+        })
+
+        agent.on('assistant_message', (message) => {
+          // Questo evento ora viene gestito tramite 'complete'
+          // Manteniamo qui solo per compatibilità o debug se necessario
+          console.log('🤖 Assistant Message (will be handled by complete event):', message.content?.substring(0, 100))
         })
 
         agent.on('error', (error) => {
           console.error('❌ Agent Error:', error)
-          res.write(`data: {"error": "${error.message}"}\n\n`)
-          res.write('data: [DONE]\n\n')
-          res.end()
+          cleanupAndEnd(() => {
+            res.write(`data: {"error": "${error.message}"}\n\n`)
+            res.write('data: [DONE]\n\n')
+            res.end()
+          })
+        })
+
+        agent.on('complete', (data) => {
+          console.log('✅ Complete event received:', data)
+          sendChunk({ role: 'assistant', content: data.content || '' })
+          cleanupAndEnd(() => {
+            sendChunk({}, 'stop')
+            res.write('data: [DONE]\n\n')
+            res.end()
+          })
+        })
+
+        agent.on('tool_message', (message) => {
+          sendChunk({ role: 'assistant', content: 'Eseguito in.'+ message.tool_calls[0].execution_time +'ms.\n' })
+          // console.log('🛠️ Tool Message:', message)
+          // const toolCallsFormatted = message.tool_calls.map((call, index) => ({
+          //   index: index,
+          //   id: call.id,
+          //   type: 'function',
+          //   function: {
+          //     name: call.function.name,
+          //     arguments: call.function.arguments,
+          //     done:true
+          //   }
+          // }))
+
+          // sendChunk({ tool_calls: toolCallsFormatted }, 'tool_calls')
+
+          // Invia il messaggio del tool come chunk
+          // sendChunk({
+          //   role: 'assistant',
+          //   content: message.content || '',
+          //   tool_calls: message.tool_calls ? message.tool_calls.map(call => ({
+          //     id: call.id,
+          //     type: 'function',
+          //     function: {
+          //       name: call.function.name,
+          //       arguments: call.arguments,
+          //       results: call.results ? call.results.map(result => (
+          //     }
+          //   })) : []
+          // })
         })
 
         // Avvia l'elaborazione in streaming
         try {
+          sendChunk({ role: 'assistant' })
+          hasStarted = true
           await agent.runStream(lastUserMessage.content)
         } catch (error) {
           console.error('❌ Stream Error:', error)
-          if (!hasStarted) {
-            res.write(`data: {"error": "${error.message}"}\n\n`)
-          }
-          res.write('data: [DONE]\n\n')
-          res.end()
+          cleanupAndEnd(() => {
+            if (!hasStarted) {
+              res.write(`data: {"error": "${error.message}"}\n\n`)
+            }
+            res.write('data: [DONE]\n\n')
+            res.end()
+          })
         }
-        
+
       } else {
         // Modalità non-streaming (risposta completa)
         const result = await agent.run(lastUserMessage.content)

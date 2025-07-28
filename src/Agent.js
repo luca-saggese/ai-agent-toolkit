@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import OpenAI from 'openai'
 import { EventEmitter } from 'events'
+import { exec } from 'child_process'
 
 /**
  * Classe Agent compatibile con @openai/agents per gestire conversazioni con AI e tool calls
@@ -9,7 +10,7 @@ import { EventEmitter } from 'events'
 export class Agent extends EventEmitter {
   constructor(options = {}) {
     super() // Inizializza EventEmitter
-    
+
     // Supporto per sia il formato nuovo che quello vecchio
     if (typeof options === 'string') {
       // Formato vecchio: Agent(apiKey, model, systemPrompt, tools)
@@ -30,15 +31,15 @@ export class Agent extends EventEmitter {
       this.systemPrompt = (options.instructions || options.systemPrompt || '') + `\n\nALWAYS CALL ONLY 1 tool at a time.\n`
       this.tools = options.tools || []
     }
-    
+
     this.messages = options.messages || []
-    
+
     // Mappa dei tools per accesso rapido
     this.toolMap = new Map()
     this.tools.forEach(tool => {
       this.toolMap.set(tool.name, tool)
     })
-    
+
     // Inizializza con il system prompt se fornito
     if (this.systemPrompt) {
       this.messages.push({ role: 'system', content: this.systemPrompt })
@@ -65,7 +66,7 @@ export class Agent extends EventEmitter {
   addMessage(content, role = 'user') {
     const message = { role, content }
     this.messages.push(message)
-    
+
     // Emetti evento per il messaggio utente
     this._emitMessage(message, 'user_message')
   }
@@ -89,7 +90,7 @@ export class Agent extends EventEmitter {
    */
   async step() {
     const toolDefinitions = this.getToolDefinitions()
-    
+
     const res = await this.openai.chat.completions.create({
       model: this.model,
       messages: this.messages,
@@ -97,28 +98,28 @@ export class Agent extends EventEmitter {
       tool_choice: toolDefinitions.length > 0 ? 'auto' : undefined,
       temperature: this.temperature
     })
-
+console.log(res)
     const msg = res.choices[0].message
 
     if (this.debug) {
-      console.log('🤖 Risposta del modello:', JSON.stringify(msg, null, 2))
+      console.log('🤖 Risposta del modello:', JSON.stringify(res, null, 2))
     }
 
     if (!msg.tool_calls) {
       // Risposta finale
       this.messages.push(msg)
-      
+
       // Emetti evento per la risposta assistant
       this._emitMessage(msg, 'assistant_message')
-      
+
       // Log del pensiero finale dell'AI (solo se verbose)
       if (this.verbose) {
         console.log('💭 Thought (Pensiero finale):')
         console.log(`   "${msg.content}"`)
       }
-      
-      return { 
-        type: 'response', 
+
+      return {
+        type: 'response',
         content: msg.content,
         role: 'assistant'
       }
@@ -145,7 +146,7 @@ export class Agent extends EventEmitter {
       tool_calls: msg.tool_calls
     }
     this.messages.push(assistantMessage)
-    
+
     // Emetti evento per il messaggio assistant con tool_calls
     this._emitMessage(assistantMessage, 'assistant_tool_calls')
 
@@ -153,15 +154,15 @@ export class Agent extends EventEmitter {
     const toolResults = []
     for (const toolCall of msg.tool_calls) {
       const { name, arguments: argsStr } = toolCall.function
-      
+
       try {
         const args = JSON.parse(argsStr)
         const tool = this.toolMap.get(name)
-        
+
         if (!tool) {
           const errorMsg = `Tool '${name}' non trovato`
           console.log(`⚠️ Tool Error: ${errorMsg}`)
-          
+
           const toolMessage = {
             role: 'tool',
             tool_call_id: toolCall.id,
@@ -169,39 +170,45 @@ export class Agent extends EventEmitter {
             content: errorMsg
           }
           this.messages.push(toolMessage)
-          
+
           // Emetti evento per il messaggio tool
           this._emitMessage(toolMessage, 'tool_message')
-          
+
           toolResults.push({ name, error: errorMsg })
           continue
         }
 
         console.log(`⚡ Eseguendo tool: ${name}...`)
+        const startTime = Date.now()
         const result = await tool.execute(args)
-        
+
         if (this.verbose) {
           console.log(`📋 Observation (Osservazione da ${name}):`)
           console.log(`   "${result}"`)
         }
-
+        toolCall.done = true;
+        toolCall.result = result;
+        toolCall.execution_time = Date.now() - startTime;
+        
         const toolMessage = {
           role: 'tool',
           tool_call_id: toolCall.id,
+          tool_calls: msg.tool_calls,
           name,
           content: typeof result === 'string' ? result : JSON.stringify(result)
+          
         }
         this.messages.push(toolMessage)
-        
+
         // Emetti evento per il messaggio tool
         this._emitMessage(toolMessage, 'tool_message')
 
         toolResults.push({ name, result })
-        
+
       } catch (error) {
         const errorMsg = `Errore nell'esecuzione di ${name}: ${error.message}`
         console.log(`❌ Tool Error: ${errorMsg}`)
-        
+
         const toolMessage = {
           role: 'tool',
           tool_call_id: toolCall.id,
@@ -209,16 +216,16 @@ export class Agent extends EventEmitter {
           content: errorMsg
         }
         this.messages.push(toolMessage)
-        
+
         // Emetti evento per il messaggio tool di errore
         this._emitMessage(toolMessage, 'tool_message')
-        
+
         toolResults.push({ name, error: errorMsg })
       }
     }
 
-    return { 
-      type: 'tool_calls', 
+    return {
+      type: 'tool_calls',
       tool_calls: msg.tool_calls,
       results: toolResults
     }
@@ -234,30 +241,30 @@ export class Agent extends EventEmitter {
       console.log(`📝 User Input: "${userMessage}"`)
       console.log('─'.repeat(60))
     }
-    
+
     // Emetti evento di inizio
     this.emit('start', { userMessage })
-    
+
     this.addUserMessage(userMessage)
-    
+
     let iterations = 0
     while (iterations < this.maxIterations) {
       iterations++
       if (this.verbose) {
         console.log(`\n🔄 Iterazione ${iterations}:`)
       }
-      
+
       // Emetti evento di iterazione
       this.emit('iteration', { iteration: iterations })
-      
+
       const result = await this.step()
-      
+
       if (result.type === 'response') {
         if (this.verbose) {
           console.log('─'.repeat(60))
           console.log(`✅ Elaborazione completata in ${iterations} iterazione${iterations > 1 ? 'i' : ''}`)
         }
-        
+
         // Emetti evento di completamento
         this.emit('complete', {
           content: result.content,
@@ -265,7 +272,7 @@ export class Agent extends EventEmitter {
           iterations,
           messages: this.getHistory()
         })
-        
+
         return {
           content: result.content,
           role: result.role,
@@ -273,13 +280,13 @@ export class Agent extends EventEmitter {
           messages: this.getHistory()
         }
       }
-      
+
       // Se ci sono stati tool calls, continua il loop
       if (result.type === 'tool_calls' && this.verbose) {
         console.log('↻ Continuando con la prossima iterazione...')
       }
     }
-    
+
     const error = new Error(`Raggiunto il limite massimo di iterazioni (${this.maxIterations})`)
     this.emit('error', error)
     throw error
@@ -294,24 +301,24 @@ export class Agent extends EventEmitter {
       console.log(`📝 User Input: "${userMessage}"`)
       console.log('─'.repeat(60))
     }
-    
+
     this.addUserMessage(userMessage)
-    
+
     let iterations = 0
     while (iterations < this.maxIterations) {
       iterations++
       if (this.verbose) {
         console.log(`\n🔄 Iterazione ${iterations}:`)
       }
-      
+
       const result = await this.step()
-      
+
       if (result.type === 'response') {
         if (this.verbose) {
           console.log('─'.repeat(60))
           console.log(`✅ Elaborazione completata in ${iterations} iterazione${iterations > 1 ? 'i' : ''}`)
         }
-        
+
         return {
           content: result.content,
           role: result.role,
@@ -319,13 +326,13 @@ export class Agent extends EventEmitter {
           messages: this.getHistory()
         }
       }
-      
+
       // Se ci sono stati tool calls, continua il loop
       if (result.type === 'tool_calls' && this.verbose) {
         console.log('↻ Continuando con la prossima iterazione...')
       }
     }
-    
+
     throw new Error(`Raggiunto il limite massimo di iterazioni (${this.maxIterations})`)
   }
 
@@ -361,7 +368,7 @@ export class Agent extends EventEmitter {
     if (!Array.isArray(messages)) {
       throw new Error('La cronologia deve essere un array di messaggi')
     }
-    
+
     // Validazione dei messaggi
     for (const msg of messages) {
       if (!msg.role || !['system', 'user', 'assistant', 'tool'].includes(msg.role)) {
@@ -371,9 +378,9 @@ export class Agent extends EventEmitter {
         throw new Error('Il messaggio deve avere un contenuto')
       }
     }
-    
+
     this.messages = [...messages]
-    
+
     // Ricostruisci la mappa dei tools se ci sono tool calls nella cronologia
     this.toolMap.clear()
     this.tools.forEach(tool => {
@@ -388,13 +395,13 @@ export class Agent extends EventEmitter {
     if (!Array.isArray(messages)) {
       throw new Error('I messaggi devono essere un array')
     }
-    
+
     for (const msg of messages) {
       if (!msg.role || !['system', 'user', 'assistant', 'tool'].includes(msg.role)) {
         throw new Error(`Ruolo del messaggio non valido: ${msg.role}`)
       }
     }
-    
+
     this.messages.push(...messages)
   }
 
@@ -405,9 +412,9 @@ export class Agent extends EventEmitter {
     return this.messages
       .filter(msg => msg.role !== 'tool') // Filtra i messaggi dei tools per leggibilità
       .map(msg => {
-        const role = msg.role === 'user' ? '👤 Utente' : 
-                    msg.role === 'assistant' ? '🤖 Assistant' : 
-                    msg.role === 'system' ? '⚙️ System' : msg.role
+        const role = msg.role === 'user' ? '👤 Utente' :
+          msg.role === 'assistant' ? '🤖 Assistant' :
+            msg.role === 'system' ? '⚙️ System' : msg.role
         return `${role}: ${msg.content || '[Tool calls]'}`
       })
       .join('\n\n')
@@ -425,14 +432,14 @@ export class Agent extends EventEmitter {
       tool: 0,
       toolCalls: 0
     }
-    
+
     this.messages.forEach(msg => {
       stats[msg.role] = (stats[msg.role] || 0) + 1
       if (msg.tool_calls) {
         stats.toolCalls += msg.tool_calls.length
       }
     })
-    
+
     return stats
   }
 
