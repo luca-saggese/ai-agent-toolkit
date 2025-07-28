@@ -27,7 +27,7 @@ export class Agent {
       this.tools = options.tools || []
     }
     
-    this.messages = []
+    this.messages = options.messages || []
     
     // Mappa dei tools per accesso rapido
     this.toolMap = new Map()

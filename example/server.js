@@ -10,7 +10,7 @@ import rateLimit from 'express-rate-limit'
 import { Agent, Tool } from '../src/index.js'
 
 const app = express()
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 11434
 
 // Middleware
 app.use(cors({
@@ -47,7 +47,7 @@ const defaultTools = [
     handler: async ({ timezone = 'UTC' }) => {
       try {
         const now = new Date()
-        return `Data e ora corrente (${timezone}): ${now.toLocaleString('it-IT', { 
+        return `Data e ora corrente (${timezone}): ${now.toLocaleString('it-IT', {
           timeZone: timezone,
           dateStyle: 'full',
           timeStyle: 'medium'
@@ -103,7 +103,7 @@ const defaultTools = [
 ]
 
 // Crea l'agent con i tools di default
-const createAgent = (model, tools = []) => {
+const createAgent = (model, tools = [], history = []) => {
   return new Agent({
     model: model || 'qwen/qwen3-coder:free',
     apiKey: process.env.OPENROUTER_API_KEY,
@@ -113,6 +113,7 @@ Quando l'utente fa una domanda che richiede informazioni in tempo reale, usa i t
 Rispondi sempre in italiano a meno che l'utente non richieda esplicitamente un'altra lingua.`,
     tools: [...defaultTools, ...tools],
     verbose: false,
+    messages: history,
     debug: false
   })
 }
@@ -123,6 +124,14 @@ app.get('/v1/models', (req, res) => {
     object: 'list',
     data: [
       {
+        id: 'deepseek/deepseek-chat-v3-0324:free',
+        object: 'model',
+        created: Date.now(),
+        owned_by: 'openrouter',
+        permission: [],
+        root: 'deepseek/deepseek-chat-v3-0324:free'
+      },
+      {
         id: 'qwen/qwen3-coder:free',
         object: 'model',
         created: Date.now(),
@@ -131,28 +140,20 @@ app.get('/v1/models', (req, res) => {
         root: 'qwen/qwen3-coder:free'
       },
       {
-        id: 'anthropic/claude-3-haiku',
+        id: 'moonshotai/kimi-k2:free',
         object: 'model',
         created: Date.now(),
         owned_by: 'openrouter',
         permission: [],
-        root: 'anthropic/claude-3-haiku'
+        root: 'moonshotai/kimi-k2:free'
       },
       {
-        id: 'openai/gpt-4o-mini',
+        id: 'mistralai/mistral-small-3.1-24b-instruct:free',
         object: 'model',
         created: Date.now(),
         owned_by: 'openrouter',
         permission: [],
-        root: 'openai/gpt-4o-mini'
-      },
-      {
-        id: 'microsoft/phi-3-mini-128k-instruct:free',
-        object: 'model',
-        created: Date.now(),
-        owned_by: 'openrouter',
-        permission: [],
-        root: 'microsoft/phi-3-mini-128k-instruct:free'
+        root: 'mistralai/mistral-small-3.1-24b-instruct:free'
       }
     ]
   })
@@ -161,7 +162,7 @@ app.get('/v1/models', (req, res) => {
 // Endpoint principale per chat completions (compatibile OpenAI)
 app.post('/v1/chat/completions', async (req, res) => {
   try {
-    const { 
+    const {
       model = 'qwen/qwen3-coder:free',
       messages = [],
       tools = [],
@@ -186,13 +187,18 @@ app.post('/v1/chat/completions', async (req, res) => {
       }))
     }
 
-    const agent = createAgent(model, customTools)
+    let history = []
+    if (messages.length > 2) {
+      history = messages.filter(m => m.role !== 'system').slice(0, -1) // Mantieni solo i messaggi precedenti all'ultimo
+    }
+
+    const agent = createAgent(model, customTools, history)
 
     // Converte i messaggi OpenAI in formato per l'agent
     if (messages.length > 0) {
       // Rimuovi il system message se presente (lo gestisce l'agent)
       const userMessages = messages.filter(msg => msg.role !== 'system')
-      
+
       // Prendi solo l'ultimo messaggio utente per semplicità
       const lastUserMessage = userMessages
         .filter(msg => msg.role === 'user')
@@ -251,7 +257,7 @@ app.post('/v1/chat/completions', async (req, res) => {
       }
 
       console.log(`✅ Response: ${result.content.substring(0, 100)}...`)
-      
+
       if (stream) {
         // Per lo streaming, invia la risposta chunk per chunk
         res.setHeader('Content-Type', 'text/event-stream')
@@ -274,7 +280,7 @@ app.post('/v1/chat/completions', async (req, res) => {
               finish_reason: null
             }]
           }
-          
+
           res.write(`data: ${JSON.stringify(chunk)}\n\n`)
           await new Promise(resolve => setTimeout(resolve, 50)) // Piccolo delay
         }
@@ -333,8 +339,8 @@ app.get('/v1/tools', (req, res) => {
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     version: '1.0.0'
   })
