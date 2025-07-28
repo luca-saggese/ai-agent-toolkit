@@ -282,7 +282,7 @@ app.post('/v1/chat/completions', async (req, res) => {
           // }))
           // console.log('toolCallsFormatted', toolCallsFormatted)
 
-          sendChunk({ role: 'assistant', content: 'Lancio il tool ' + message.tool_calls[0].function.name + '... ' })
+          sendChunk({ role: 'assistant', content: '_Lancio il tool ' + message.tool_calls[0].function.name + '... ' })
 
           // sendChunk({ tool_calls: toolCallsFormatted })
 
@@ -315,7 +315,7 @@ app.post('/v1/chat/completions', async (req, res) => {
         })
 
         agent.on('tool_message', (message) => {
-          sendChunk({ role: 'assistant', content: 'Eseguito in.'+ message.tool_calls[0].execution_time +'ms.\n' })
+          sendChunk({ role: 'assistant', content: 'Eseguito in.'+ message.tool_calls[0].execution_time +'ms._\n' })
           // console.log('🛠️ Tool Message:', message)
           // const toolCallsFormatted = message.tool_calls.map((call, index) => ({
           //   index: index,
