@@ -30,6 +30,7 @@
     "example:basic": "node example/basic.js",
     "server": "node example/server.js",
     "server:dev": "node --watch example/server.js",
+    "test": "node example/test.js",
     "build": "echo \"No build step needed for pure ESM package\"",
     "prepublishOnly": "npm test"
   },
