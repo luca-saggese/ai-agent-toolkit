@@ -48,7 +48,7 @@ export class Agent extends EventEmitter {
     // Configurazioni aggiuntive
     this.maxIterations = options.maxIterations || 10
     this.temperature = options.temperature || 0.7
-    this.debug = options.debug || true
+    this.debug = options.debug !== undefined ? options.debug : true
     this.verbose = options.verbose !== undefined ? options.verbose : true // Default attivo per mostrare thoughts
   }
 
@@ -189,14 +189,14 @@ export class Agent extends EventEmitter {
         toolCall.done = true;
         toolCall.result = result;
         toolCall.execution_time = Date.now() - startTime;
-        
+
         const toolMessage = {
           role: 'tool',
           tool_call_id: toolCall.id,
           tool_calls: msg.tool_calls,
           name,
           content: typeof result === 'string' ? result : JSON.stringify(result)
-          
+
         }
         this.messages.push(toolMessage)
 
