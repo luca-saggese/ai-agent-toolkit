@@ -1,7 +1,6 @@
 import 'dotenv/config'
 import OpenAI from 'openai'
 import { EventEmitter } from 'events'
-import { exec } from 'child_process'
 
 /**
  * Classe Agent compatibile con @openai/agents per gestire conversazioni con AI e tool calls
