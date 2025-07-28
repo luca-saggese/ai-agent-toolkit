@@ -29,6 +29,33 @@ const limiter = rateLimit({
 })
 app.use('/v1/', limiter)
 
+// --- API KEY VALIDATION MIDDLEWARE ---
+const AUTH_KEY = process.env.AUTH_KEY;
+
+app.use((req, res, next) => {
+  if (AUTH_KEY) {
+    // Cerca la chiave nell'header Authorization: Bearer ... oppure X-API-KEY
+    const authHeader = req.headers['authorization'] || '';
+    const apiKeyHeader = req.headers['x-api-key'] || '';
+    let key = '';
+    if (authHeader.startsWith('Bearer ')) {
+      key = authHeader.replace('Bearer ', '').trim();
+    } else if (apiKeyHeader) {
+      key = apiKeyHeader.trim();
+    }
+    if (key !== AUTH_KEY) {
+      return res.status(401).json({
+        error: {
+          message: 'Unauthorized: invalid or missing API key',
+          type: 'unauthorized'
+        }
+      });
+    }
+  }
+  next();
+});
+// --- END API KEY VALIDATION ---
+
 // Default tools disponibili
 const defaultTools = [
   new Tool({
