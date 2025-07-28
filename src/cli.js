@@ -12,7 +12,7 @@ export function createChatInterface(agent, options = {}) {
   const {
     prompt = '💬 Tu: ',
     welcomeMessage = '🤖 Assistant: Ciao! Come posso aiutarti oggi?',
-    exitCommands = ['exit', 'quit'],
+    exitCommands = ['/exit', '/quit'],
     showHelp = true
   } = options
 
@@ -33,38 +33,38 @@ export function createChatInterface(agent, options = {}) {
     }
     
     switch (command) {
-      case 'reset':
+      case '/reset':
         agent.reset()
         console.log('\n🔄 Conversazione resettata!')
         return true
         
-      case 'history':
+      case '/history':
         console.log('\n📚 Cronologia:')
         console.log(agent.getReadableHistory?.() || JSON.stringify(agent.getHistory(), null, 2))
         return true
         
-      case 'tools':
+      case '/tools':
         console.log('\n🛠 Tools disponibili:')
         agent.getTools().forEach(tool => {
           console.log(`  • ${tool.name}: ${tool.description}`)
         })
         return true
         
-      case 'verbose on':
+      case '/verbose on':
         if (agent.setVerbose) {
           agent.setVerbose(true)
           console.log('\n📢 Modalità verbose attivata')
         }
         return true
         
-      case 'verbose off':
+      case '/verbose off':
         if (agent.setVerbose) {
           agent.setVerbose(false)
           console.log('\n🔇 Modalità verbose disattivata')
         }
         return true
         
-      case 'help':
+      case '/help':
         showHelpMessage()
         return true
         
@@ -76,11 +76,11 @@ export function createChatInterface(agent, options = {}) {
   function showHelpMessage() {
     console.log('\n📖 Comandi disponibili:')
     console.log(`  • ${exitCommands.join('/')}      - Esci dalla chat`)
-    console.log('  • reset           - Resetta la conversazione')
-    console.log('  • history         - Mostra cronologia')
-    console.log('  • tools           - Lista dei tools disponibili')
-    console.log('  • verbose on/off  - Attiva/disattiva modalità verbose')
-    console.log('  • help            - Mostra questo aiuto')
+    console.log('  • /reset           - Resetta la conversazione')
+    console.log('  • /history         - Mostra cronologia')
+    console.log('  • /tools           - Lista dei tools disponibili')
+    console.log('  • /verbose on/off  - Attiva/disattiva modalità verbose')
+    console.log('  • /help            - Mostra questo aiuto')
   }
 
   // Main input handler
