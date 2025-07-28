@@ -29,70 +29,183 @@ const greetTool = new Tool({
 
 // Create agent
 const agent = new Agent({
-  model: 'anthropic/claude-3-haiku', // Any OpenRouter model
-  apiKey: process.env.OPENROUTER_API_KEY,
-  instructions: 'You are a helpful assistant.',
-  tools: [greetTool]
+  model: 'qwen/qwen3-coder:free',
+  tools: [greetTool],
+  instructions: 'You are a helpful assistant.'
 })
 
-// Use the agent
-const response = await agent.run('Greet John')
-console.log(response.content) // Output: Hello, John!
+// Use agent
+const result = await agent.run('Greet John')
+console.log(result.content) // AI will use the greet tool
 ```
 
-### Interactive Chat
+## Streaming Support
 
-```javascript
-import { Agent, createChatInterface } from '@yourname/ai-agent-toolkit'
+### Event-based Streaming
 
-const agent = new Agent({
-  model: 'qwen/qwen3-coder:free', // Free model on OpenRouter
-  apiKey: process.env.OPENROUTER_API_KEY,
-  instructions: 'You are a helpful assistant.',
-  tools: [],
-  verbose: true
-})
-
-// Start interactive chat
-createChatInterface(agent)
-```
-
-### Advanced Tool with Zod Validation
+The Agent class extends EventEmitter and provides real-time events for all messages:
 
 ```javascript
 import { Agent, Tool } from '@yourname/ai-agent-toolkit'
-import { z } from 'zod'
 
-const mathTool = new Tool({
-  name: 'calculate',
-  description: 'Performs mathematical calculations',
-  schema: z.object({
-    operation: z.enum(['add', 'subtract', 'multiply', 'divide']),
-    a: z.number().describe('First number'),
-    b: z.number().describe('Second number')
-  }),
-  handler: async ({ operation, a, b }) => {
-    switch (operation) {
-      case 'add': return a + b
-      case 'subtract': return a - b
-      case 'multiply': return a * b
-      case 'divide': return a / b
-    }
-  }
+const agent = new Agent({
+  model: 'qwen/qwen3-coder:free',
+  tools: [/* your tools */],
+  verbose: false // Disable console output for cleaner event handling
 })
+
+// Listen to all events
+agent.on('start', (data) => {
+  console.log('🚀 Started processing:', data.userMessage)
+})
+
+agent.on('user_message', (message) => {
+  console.log('👤 User:', message.content)
+})
+
+agent.on('assistant_tool_calls', (message) => {
+  console.log('🛠️ Tool calls:', message.tool_calls)
+})
+
+agent.on('tool_message', (message) => {
+  console.log('🔧 Tool result:', message.content)
+})
+
+agent.on('assistant_message', (message) => {
+  console.log('🤖 Assistant:', message.content)
+})
+
+agent.on('complete', (data) => {
+  console.log('✅ Complete:', data.content)
+})
+
+agent.on('error', (error) => {
+  console.log('❌ Error:', error.message)
+})
+
+// Use streaming version
+await agent.runStream('Your message here')
 ```
 
-### History Management
+### Available Events
+
+- `start` - Processing started with user message
+- `user_message` - User message added to conversation
+- `assistant_tool_calls` - Assistant wants to call tools
+- `tool_message` - Tool execution result
+- `assistant_message` - Final assistant response
+- `iteration` - New iteration started
+- `complete` - Processing completed
+- `error` - Error occurred
+- `message` - Generic event for all messages (includes eventType)
+
+## OpenAI-Compatible Server
+
+### Running the Server
+
+```bash
+npm run server
+```
+
+The server provides an OpenAI-compatible API endpoint with streaming support:
+
+```
+POST /v1/chat/completions
+```
+
+### Server Features
+
+- ✅ **OpenAI-compatible API** - Drop-in replacement for OpenAI API
+- ✅ **Streaming support** - Real-time response streaming with proper chunk format
+- ✅ **Tool calling** - Full support for function calling
+- ✅ **OpenWebUI compatible** - Works seamlessly with OpenWebUI
+- ✅ **Multiple models** - Supports various OpenRouter models
+
+### Example Usage
+
+#### Non-streaming request:
 
 ```javascript
-import { saveHistory, loadHistory } from '@yourname/ai-agent-toolkit'
+const response = await fetch('http://localhost:11434/v1/chat/completions', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    model: 'qwen/qwen3-coder:free',
+    messages: [
+      { role: 'user', content: 'What time is it?' }
+    ],
+    stream: false
+  })
+})
 
-// Save conversation
-const filename = saveHistory(agent)
-console.log(`History saved to: ${filename}`)
+const data = await response.json()
+console.log(data.choices[0].message.content)
+```
 
-// Load conversation
-loadHistory(agent, 'chat_history_2025-07-27T10-30-00.json')
+#### Streaming request:
+
+```javascript
+const response = await fetch('http://localhost:11434/v1/chat/completions', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    model: 'qwen/qwen3-coder:free',
+    messages: [
+      { role: 'user', content: 'Tell me a story' }
+    ],
+    stream: true
+  })
+})
+
+const reader = response.body.getReader()
+const decoder = new TextDecoder()
+
+while (true) {
+  const { done, value } = await reader.read()
+  if (done) break
+  
+  const chunk = decoder.decode(value)
+  const lines = chunk.split('\n')
+  
+  for (const line of lines) {
+    if (line.startsWith('data: ')) {
+      const data = line.slice(6)
+      if (data === '[DONE]') break
+      
+      const parsed = JSON.parse(data)
+      const content = parsed.choices?.[0]?.delta?.content
+      if (content) {
+        process.stdout.write(content)
+      }
+    }
+  }
+}
+```
+
+### Streaming Format
+
+The server follows OpenAI's exact streaming format:
+
+#### For tool calls:
+1. **Chunk 1**: `{ delta: { role: "assistant" } }`
+2. **Chunk 2**: `{ delta: { tool_calls: [...] } }`
+3. **Chunk 3**: `{ delta: {}, finish_reason: "tool_calls" }`
+
+#### For text responses:
+1. **Chunk 1**: `{ delta: { role: "assistant" } }`
+2. **Chunk N**: `{ delta: { content: "word" } }`
+3. **Final**: `{ delta: {}, finish_reason: "stop" }`
+
+### Testing Streaming
+
+Test the streaming format with the provided test scripts:
+
+```bash
+# Test basic streaming functionality
+npm run test:streaming
+
+# Test OpenAI format compliance
+npm run test:openai
 ```
 
 ## API Reference
@@ -156,7 +269,7 @@ Loads conversation history from JSON file.
 OPENROUTER_API_KEY=your_openrouter_key
 
 # OpenAI API Key (Alternative)
-OPENAI_API_KEY=your_openai_key
+OPENAI_API_KEY=your_open_ai_key
 ```
 
 ### Why OpenRouter?

@@ -171,7 +171,7 @@ app.post('/v1/chat/completions', async (req, res) => {
       max_tokens = 2000
     } = req.body
 
-    console.log(`🚀 Request: ${model} - ${messages.length} messages - Tools: ${tools.length}`)
+    console.log(`🚀 Request: ${model} - ${messages.length} messages - Tools: ${tools.length} - Stream: ${stream}`)
 
     // Crea agent con tools personalizzati se forniti
     let customTools = []
@@ -213,94 +213,166 @@ app.post('/v1/chat/completions', async (req, res) => {
         })
       }
 
-      // Esegui l'agent
-      const result = await agent.run(lastUserMessage.content)
-
-      // Prepara la risposta in formato OpenAI
-      const response = {
-        id: `chatcmpl-${Date.now()}`,
-        object: 'chat.completion',
-        created: Math.floor(Date.now() / 1000),
-        model: model,
-        choices: [{
-          index: 0,
-          message: {
-            role: 'assistant',
-            content: result.content
-          },
-          finish_reason: 'stop'
-        }],
-        usage: {
-          prompt_tokens: Math.floor(lastUserMessage.content.length / 4),
-          completion_tokens: Math.floor(result.content.length / 4),
-          total_tokens: Math.floor((lastUserMessage.content.length + result.content.length) / 4)
-        }
-      }
-
-      // Se ci sono stati tool calls, includili nella risposta
-      const history = agent.getHistory()
-      const toolCalls = history
-        .filter(msg => msg.role === 'assistant' && msg.tool_calls)
-        .map(msg => msg.tool_calls)
-        .flat()
-
-      if (toolCalls.length > 0) {
-        response.choices[0].message.tool_calls = toolCalls.map(call => ({
-          id: call.id,
-          type: 'function',
-          function: {
-            name: call.function.name,
-            arguments: call.function.arguments
-          }
-        }))
-        response.choices[0].finish_reason = 'tool_calls'
-      }
-
-      console.log(`✅ Response: ${result.content.substring(0, 100)}...`)
-
       if (stream) {
-        // Per lo streaming, invia la risposta chunk per chunk
+        // Modalità streaming - implementazione corretta formato OpenAI
         res.setHeader('Content-Type', 'text/event-stream')
         res.setHeader('Cache-Control', 'no-cache')
         res.setHeader('Connection', 'keep-alive')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('Access-Control-Allow-Headers', 'Cache-Control')
 
-        // Simula streaming dividendo la risposta in chunks
-        const chunks = result.content.split(' ')
-        for (let i = 0; i < chunks.length; i++) {
+        const requestId = `chatcmpl-${Date.now()}`
+        const created = Math.floor(Date.now() / 1000)
+        
+        // Helper per inviare chunk
+        const sendChunk = (delta, finishReason = null) => {
           const chunk = {
-            id: response.id,
+            id: requestId,
             object: 'chat.completion.chunk',
-            created: response.created,
+            created: created,
             model: model,
             choices: [{
               index: 0,
-              delta: {
-                content: (i === 0 ? '' : ' ') + chunks[i]
-              },
-              finish_reason: null
+              delta: delta,
+              finish_reason: finishReason
             }]
           }
-
           res.write(`data: ${JSON.stringify(chunk)}\n\n`)
-          await new Promise(resolve => setTimeout(resolve, 50)) // Piccolo delay
         }
 
-        // Chunk finale
-        const finalChunk = {
-          id: response.id,
-          object: 'chat.completion.chunk',
-          created: response.created,
+        let hasStarted = false
+        let pendingContent = ''
+
+        // Gestisci eventi dell'agent per streaming
+        agent.on('assistant_tool_calls', (message) => {
+          // Chunk 1: Inizio messaggio assistant
+          if (!hasStarted) {
+            sendChunk({ role: 'assistant' })
+            hasStarted = true
+          }
+          
+          // Chunk 2: Tool calls
+          sendChunk({
+            tool_calls: message.tool_calls.map(call => ({
+              id: call.id,
+              type: 'function',
+              function: {
+                name: call.function.name,
+                arguments: call.function.arguments
+              }
+            }))
+          })
+          
+          // Chunk 3: Finale con finish_reason
+          sendChunk({}, 'tool_calls')
+          res.write('data: [DONE]\n\n')
+          res.end()
+        })
+
+        agent.on('assistant_message', (message) => {
+          // Chunk 1: Inizio messaggio assistant
+          if (!hasStarted) {
+            sendChunk({ role: 'assistant' })
+            hasStarted = true
+          }
+          
+          // Streaming del contenuto testuale
+          if (message.content) {
+            // Spezza la risposta in chunks per simulare streaming del testo
+            const words = message.content.split(' ')
+            let sentWords = 0
+            
+            const sendWordChunks = () => {
+              if (sentWords >= words.length) {
+                // Chunk finale
+                sendChunk({}, 'stop')
+                res.write('data: [DONE]\n\n')
+                res.end()
+                return
+              }
+              
+              const word = words[sentWords]
+              const content = sentWords === 0 ? word : ' ' + word
+              sentWords++
+              
+              sendChunk({ content })
+              
+              setTimeout(sendWordChunks, 50) // Piccolo delay tra parole
+            }
+            
+            sendWordChunks()
+          } else {
+            // Nessun contenuto, chiudi immediatamente
+            sendChunk({}, 'stop')
+            res.write('data: [DONE]\n\n')
+            res.end()
+          }
+        })
+
+        agent.on('error', (error) => {
+          console.error('❌ Agent Error:', error)
+          res.write(`data: {"error": "${error.message}"}\n\n`)
+          res.write('data: [DONE]\n\n')
+          res.end()
+        })
+
+        // Avvia l'elaborazione in streaming
+        try {
+          await agent.runStream(lastUserMessage.content)
+        } catch (error) {
+          console.error('❌ Stream Error:', error)
+          if (!hasStarted) {
+            res.write(`data: {"error": "${error.message}"}\n\n`)
+          }
+          res.write('data: [DONE]\n\n')
+          res.end()
+        }
+        
+      } else {
+        // Modalità non-streaming (risposta completa)
+        const result = await agent.run(lastUserMessage.content)
+
+        // Prepara la risposta in formato OpenAI
+        const response = {
+          id: `chatcmpl-${Date.now()}`,
+          object: 'chat.completion',
+          created: Math.floor(Date.now() / 1000),
           model: model,
           choices: [{
             index: 0,
-            delta: {},
+            message: {
+              role: 'assistant',
+              content: result.content
+            },
             finish_reason: 'stop'
-          }]
+          }],
+          usage: {
+            prompt_tokens: Math.floor(lastUserMessage.content.length / 4),
+            completion_tokens: Math.floor(result.content.length / 4),
+            total_tokens: Math.floor((lastUserMessage.content.length + result.content.length) / 4)
+          }
         }
-        res.write(`data: ${JSON.stringify(finalChunk)}\n\n`)
-        res.write('data: [DONE]\n\n')
-        res.end()
-      } else {
+
+        // Se ci sono stati tool calls, includili nella risposta
+        const history = agent.getHistory()
+        const toolCalls = history
+          .filter(msg => msg.role === 'assistant' && msg.tool_calls)
+          .map(msg => msg.tool_calls)
+          .flat()
+
+        if (toolCalls.length > 0) {
+          response.choices[0].message.tool_calls = toolCalls.map(call => ({
+            id: call.id,
+            type: 'function',
+            function: {
+              name: call.function.name,
+              arguments: call.function.arguments
+            }
+          }))
+          response.choices[0].finish_reason = 'tool_calls'
+        }
+
+        console.log(`✅ Response: ${result.content.substring(0, 100)}...`)
         res.json(response)
       }
     } else {

@@ -1,11 +1,15 @@
 import 'dotenv/config'
 import OpenAI from 'openai'
+import { EventEmitter } from 'events'
 
 /**
  * Classe Agent compatibile con @openai/agents per gestire conversazioni con AI e tool calls
+ * Supporta eventi per streaming di tutti i messaggi (user, assistant, tool, tool_calls)
  */
-export class Agent {
+export class Agent extends EventEmitter {
   constructor(options = {}) {
+    super() // Inizializza EventEmitter
+    
     // Supporto per sia il formato nuovo che quello vecchio
     if (typeof options === 'string') {
       // Formato vecchio: Agent(apiKey, model, systemPrompt, tools)
@@ -43,15 +47,27 @@ export class Agent {
     // Configurazioni aggiuntive
     this.maxIterations = options.maxIterations || 10
     this.temperature = options.temperature || 0.7
-    this.debug = options.debug || false
+    this.debug = options.debug || true
     this.verbose = options.verbose !== undefined ? options.verbose : true // Default attivo per mostrare thoughts
+  }
+
+  /**
+   * Emette un evento per il messaggio specificato
+   */
+  _emitMessage(message, eventType = 'message') {
+    this.emit(eventType, message)
+    this.emit('message', { ...message, eventType })
   }
 
   /**
    * Aggiunge un messaggio utente alla conversazione
    */
   addMessage(content, role = 'user') {
-    this.messages.push({ role, content })
+    const message = { role, content }
+    this.messages.push(message)
+    
+    // Emetti evento per il messaggio utente
+    this._emitMessage(message, 'user_message')
   }
 
   /**
@@ -92,6 +108,9 @@ export class Agent {
       // Risposta finale
       this.messages.push(msg)
       
+      // Emetti evento per la risposta assistant
+      this._emitMessage(msg, 'assistant_message')
+      
       // Log del pensiero finale dell'AI (solo se verbose)
       if (this.verbose) {
         console.log('💭 Thought (Pensiero finale):')
@@ -120,11 +139,15 @@ export class Agent {
     }
 
     // Aggiungi il messaggio assistant con le tool_calls
-    this.messages.push({
+    const assistantMessage = {
       role: 'assistant',
       content: null,
       tool_calls: msg.tool_calls
-    })
+    }
+    this.messages.push(assistantMessage)
+    
+    // Emetti evento per il messaggio assistant con tool_calls
+    this._emitMessage(assistantMessage, 'assistant_tool_calls')
 
     // Esegui ogni tool call
     const toolResults = []
@@ -139,12 +162,16 @@ export class Agent {
           const errorMsg = `Tool '${name}' non trovato`
           console.log(`⚠️ Tool Error: ${errorMsg}`)
           
-          this.messages.push({
+          const toolMessage = {
             role: 'tool',
             tool_call_id: toolCall.id,
             name,
             content: errorMsg
-          })
+          }
+          this.messages.push(toolMessage)
+          
+          // Emetti evento per il messaggio tool
+          this._emitMessage(toolMessage, 'tool_message')
           
           toolResults.push({ name, error: errorMsg })
           continue
@@ -158,12 +185,16 @@ export class Agent {
           console.log(`   "${result}"`)
         }
 
-        this.messages.push({
+        const toolMessage = {
           role: 'tool',
           tool_call_id: toolCall.id,
           name,
           content: typeof result === 'string' ? result : JSON.stringify(result)
-        })
+        }
+        this.messages.push(toolMessage)
+        
+        // Emetti evento per il messaggio tool
+        this._emitMessage(toolMessage, 'tool_message')
 
         toolResults.push({ name, result })
         
@@ -171,12 +202,16 @@ export class Agent {
         const errorMsg = `Errore nell'esecuzione di ${name}: ${error.message}`
         console.log(`❌ Tool Error: ${errorMsg}`)
         
-        this.messages.push({
+        const toolMessage = {
           role: 'tool',
           tool_call_id: toolCall.id,
           name,
           content: errorMsg
-        })
+        }
+        this.messages.push(toolMessage)
+        
+        // Emetti evento per il messaggio tool di errore
+        this._emitMessage(toolMessage, 'tool_message')
         
         toolResults.push({ name, error: errorMsg })
       }
@@ -187,6 +222,67 @@ export class Agent {
       tool_calls: msg.tool_calls,
       results: toolResults
     }
+  }
+
+  /**
+   * Versione streamable di run() che emette eventi per ogni messaggio
+   * Usa questa versione quando vuoi ricevere eventi in tempo reale
+   */
+  async runStream(userMessage) {
+    if (this.verbose) {
+      console.log('🚀 Iniziando elaborazione in streaming...')
+      console.log(`📝 User Input: "${userMessage}"`)
+      console.log('─'.repeat(60))
+    }
+    
+    // Emetti evento di inizio
+    this.emit('start', { userMessage })
+    
+    this.addUserMessage(userMessage)
+    
+    let iterations = 0
+    while (iterations < this.maxIterations) {
+      iterations++
+      if (this.verbose) {
+        console.log(`\n🔄 Iterazione ${iterations}:`)
+      }
+      
+      // Emetti evento di iterazione
+      this.emit('iteration', { iteration: iterations })
+      
+      const result = await this.step()
+      
+      if (result.type === 'response') {
+        if (this.verbose) {
+          console.log('─'.repeat(60))
+          console.log(`✅ Elaborazione completata in ${iterations} iterazione${iterations > 1 ? 'i' : ''}`)
+        }
+        
+        // Emetti evento di completamento
+        this.emit('complete', {
+          content: result.content,
+          role: result.role,
+          iterations,
+          messages: this.getHistory()
+        })
+        
+        return {
+          content: result.content,
+          role: result.role,
+          iterations,
+          messages: this.getHistory()
+        }
+      }
+      
+      // Se ci sono stati tool calls, continua il loop
+      if (result.type === 'tool_calls' && this.verbose) {
+        console.log('↻ Continuando con la prossima iterazione...')
+      }
+    }
+    
+    const error = new Error(`Raggiunto il limite massimo di iterazioni (${this.maxIterations})`)
+    this.emit('error', error)
+    throw error
   }
 
   /**
