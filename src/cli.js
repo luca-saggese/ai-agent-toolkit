@@ -13,7 +13,8 @@ export function createChatInterface(agent, options = {}) {
     prompt = '💬 Tu: ',
     welcomeMessage = '🤖 Assistant: Ciao! Come posso aiutarti oggi?',
     exitCommands = ['/exit', '/quit'],
-    showHelp = true
+    showHelp = true,
+    assistantName = 'Assistant',
   } = options
 
   const rl = readline.createInterface({
@@ -95,7 +96,7 @@ export function createChatInterface(agent, options = {}) {
 
     try {
       const result = await agent.run(input)
-      console.log(`\n🤖 Assistant: ${result.content}`)
+      console.log(`\n🤖 ${assistantName}: ${result.content}`)
     } catch (error) {
       console.error('\n❌ Errore:', error.message)
     }
