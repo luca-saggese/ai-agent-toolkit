@@ -105,6 +105,42 @@ createChatInterface(agent, {
 })
 ```
 
+## 🖥️ Modalità d'uso: CLI, API server e Web GUI
+
+Puoi usare questo toolkit in tre modi principali:
+
+### 1. Interfaccia CLI (console)
+
+Esegui la chat interattiva direttamente da terminale:
+
+```bash
+node example/basic.js
+```
+
+- Chatta con l'agente AI e prova i tool direttamente da console
+- Ideale per sviluppo, debug e test rapidi
+
+### 2. API server compatibile OpenAI/OpenRouter
+
+Avvia il server API compatibile OpenAI (con tool calling):
+
+```bash
+node example/server.js
+```
+
+- Espone endpoint `/v1/chat/completions` e `/v1/models` compatibili con OpenAI
+- Puoi collegare qualsiasi client OpenAI, plugin, o frontend custom
+
+### 3. Web GUI (OpenWebUI)
+
+Collega il server a una web UI moderna come [OpenWebUI](https://github.com/open-webui/open-webui):
+
+- Interfaccia grafica user-friendly
+- Supporta tool calling, history, modelli multipli
+- **Guida dettagliata**: [openwebui.md](./openwebui.md)
+
+> Consulta il file [`openwebui.md`](./openwebui.md) per istruzioni dettagliate su come collegare OpenWebUI al server e sfruttare tutte le funzionalità avanzate.
+
 ## 🎯 Modelli Supportati
 
 Tramite **OpenRouter**, puoi usare tutti questi modelli:
