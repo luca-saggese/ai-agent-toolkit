@@ -29,10 +29,7 @@
     "example": "node example/index.js",
     "example:basic": "node example/basic.js",
     "server": "node example/server.js",
-    "test:streaming": "node example/test-streaming.js",
-    "test:openai": "node example/test-openai-format.js",
     "server:dev": "node --watch example/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
     "build": "echo \"No build step needed for pure ESM package\"",
     "prepublishOnly": "npm test"
   },
