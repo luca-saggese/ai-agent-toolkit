@@ -29,6 +29,7 @@ export class Agent extends EventEmitter {
       this.model = options.model || 'qwen/qwen3-coder:free'
       this.systemPrompt = (options.instructions || options.systemPrompt || '') + `\n\nALWAYS CALL ONLY 1 tool at a time.\n`
       this.tools = options.tools || []
+      this.session = options.session || null // Aggiunto per supportare sessioni
     }
 
     this.messages = options.messages || []
@@ -179,7 +180,7 @@ export class Agent extends EventEmitter {
 
         console.log(`⚡ Eseguendo tool: ${name}...`)
         const startTime = Date.now()
-        const result = await tool.execute(args)
+        const result = await tool.execute(args, this.session)
 
         if (this.verbose) {
           console.log(`📋 Observation (Osservazione da ${name}):`)
