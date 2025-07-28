@@ -37,7 +37,7 @@ export { Agent } from './Agent.js'
 export { Tool } from './Tool.js'
 
 // Utility functions
-export { createChatInterface } from './utils.js'
+export { createChatInterface } from './cli.js'
 
 /**
  * Quick setup function for common use cases
