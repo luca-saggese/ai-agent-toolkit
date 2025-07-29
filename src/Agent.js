@@ -102,7 +102,9 @@ export class Agent extends EventEmitter {
       tool_choice: toolDefinitions.length > 0 ? 'auto' : undefined,
       temperature: this.temperature
     })
-
+    if (res.error) {
+      throw new Error(`OpenAI API Error: ${res.error || 'Unknown error'}`)
+    }
     const msg = res.choices[0].message
 
     if (this.debug) {
