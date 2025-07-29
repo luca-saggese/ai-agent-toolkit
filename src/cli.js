@@ -15,6 +15,7 @@ export function createChatInterface(agent, options = {}) {
     exitCommands = ['/exit', '/quit'],
     showHelp = true,
     assistantName = 'Assistant',
+    historyFile = null
   } = options
 
   const rl = readline.createInterface({
@@ -76,7 +77,7 @@ export function createChatInterface(agent, options = {}) {
 
   function showHelpMessage() {
     console.log('\n📖 Comandi disponibili:')
-    console.log(`  • ${exitCommands.join('/')}      - Esci dalla chat`)
+    console.log(`  • ${exitCommands.join(' ')}      - Esci dalla chat`)
     console.log('  • /reset           - Resetta la conversazione')
     console.log('  • /history         - Mostra cronologia')
     console.log('  • /tools           - Lista dei tools disponibili')
@@ -86,6 +87,7 @@ export function createChatInterface(agent, options = {}) {
 
   // Main input handler
   async function handleInput(input) {
+    
     if (handleSpecialCommands(input)) {
       return
     }
@@ -97,6 +99,10 @@ export function createChatInterface(agent, options = {}) {
     try {
       const result = await agent.run(input)
       console.log(`\n🤖 ${assistantName}: ${result.content}`)
+      if(historyFile) {
+        saveHistory(agent, historyFile)
+        console.log(`\n💾 Cronologia salvata in ${historyFile}`)
+      }
     } catch (error) {
       console.error('\n❌ Errore:', error.message)
     }
