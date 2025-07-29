@@ -1,7 +1,7 @@
-import { callAI } from './ai-client.js';
+import { callAI } from '@lvx74/openrrouter-ai-agent';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -68,11 +68,12 @@ export async function checkAndCompressHistory(history) {
         throw new Error('La cronologia deve essere un array');
     }
 
-    if (history.length > (process.env.MAX_HISTORY_LENGTH || 50)) {
+    if (history.length > (process.env.MAX_HISTORY_LENGTH || 40)) {
+        console.log(`🔄 Cronologia troppo lunga (${history.length} messaggi), compressione in corso...`);
         const latest = history.slice(-4);
-        const data = history.slice(0, -4).filter(m=>m.role !== 'system');
-        const prompt = fs.readFileSync(join(__dirname, '../prompts/compress_history_prompt.txt'), 'utf-8') + '\n' + JSON.stringify(data, null, 2);
-        const compressed = await callAI(prompt, 0.2, process.env.SMALL_MODEL );
+        const data = history.slice(0, -4).filter(m=>m.role !== 'system').slice(-(process.env.MAX_HISTORY_LENGTH || 40));
+        const prompt = fs.readFileSync(join(__dirname, '../prompts/summarize_conversation_prompt.txt'), 'utf-8') + '\n' + JSON.stringify(data);
+        const compressed = await callAI(prompt, 0.2, process.env.COMPRESS_MODEL || 'deepseek/deepseek-chat-v3-0324:free' );
         const parsed = await parseJSON(compressed);
         if (!parsed || !Array.isArray(parsed)) {
             throw new Error('La risposta compressa non è un array valido');
