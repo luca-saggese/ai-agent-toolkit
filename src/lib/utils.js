@@ -18,9 +18,10 @@ export async function parseJSON(content, tryAgain = true, logger = console) {
             content = content.slice(0, -1);
         }
 
-        const start = Math.min(content.indexOf('{'), content.indexOf('['));
-        const end = Math.max(content.lastIndexOf('}'), content.lastIndexOf(']'));
 
+
+        const start = content.indexOf(/[\{\[]/)
+        const end = content.lastIndexOf(/[\}\]]/)
         logger.log('🔍 parseJSON - Posizioni JSON:', { start, end, contentLength: content.length });
 
         if (start === -1 || end === -1) {
