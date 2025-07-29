@@ -18,6 +18,16 @@ export function createChatInterface(agent, options = {}) {
     historyFile = null
   } = options
 
+  if (historyFile && !fs.existsSync(historyFile)) {
+    try {
+      agent.setHistory(fs.readFileSync(historyFile, 'utf8'))
+      console.log(`\n📜 Cronologia caricata da ${historyFile}`)
+    } catch (error) {
+      console.error(`\n❌ Errore nel caricamento della cronologia: ${error.message}`)
+      return
+    }
+  }
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -27,49 +37,49 @@ export function createChatInterface(agent, options = {}) {
   // Special commands handler
   function handleSpecialCommands(input) {
     const command = input.toLowerCase().trim()
-    
+
     if (exitCommands.includes(command)) {
       console.log('\n👋 Arrivederci!')
       rl.close()
       return true
     }
-    
+
     switch (command) {
       case '/reset':
         agent.reset()
         console.log('\n🔄 Conversazione resettata!')
         return true
-        
+
       case '/history':
         console.log('\n📚 Cronologia:')
         console.log(agent.getReadableHistory?.() || JSON.stringify(agent.getHistory(), null, 2))
         return true
-        
+
       case '/tools':
         console.log('\n🛠 Tools disponibili:')
         agent.getTools().forEach(tool => {
           console.log(`  • ${tool.name}: ${tool.description}`)
         })
         return true
-        
+
       case '/verbose on':
         if (agent.setVerbose) {
           agent.setVerbose(true)
           console.log('\n📢 Modalità verbose attivata')
         }
         return true
-        
+
       case '/verbose off':
         if (agent.setVerbose) {
           agent.setVerbose(false)
           console.log('\n🔇 Modalità verbose disattivata')
         }
         return true
-        
+
       case '/help':
         showHelpMessage()
         return true
-        
+
       default:
         return false
     }
@@ -87,7 +97,7 @@ export function createChatInterface(agent, options = {}) {
 
   // Main input handler
   async function handleInput(input) {
-    
+
     if (handleSpecialCommands(input)) {
       return
     }
@@ -99,7 +109,7 @@ export function createChatInterface(agent, options = {}) {
     try {
       const result = await agent.run(input)
       console.log(`\n🤖 ${assistantName}: ${result.content}`)
-      if(historyFile) {
+      if (historyFile) {
         saveHistory(agent, historyFile)
         console.log(`\n💾 Cronologia salvata in ${historyFile}`)
       }
@@ -140,7 +150,7 @@ export function saveHistory(agent, filename) {
   if (!filename) {
     filename = `chat_history_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`
   }
-  
+
   const history = agent.getHistory()
   fs.writeFileSync(filename, JSON.stringify(history, null, 2))
   return filename
@@ -153,10 +163,10 @@ export function loadHistory(agent, filename) {
   if (!fs.existsSync(filename)) {
     throw new Error(`File not found: ${filename}`)
   }
-  
+
   const historyData = fs.readFileSync(filename, 'utf8')
   const history = JSON.parse(historyData)
-  
+
   agent.setHistory(history)
   return history
 }
