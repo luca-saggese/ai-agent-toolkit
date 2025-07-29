@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import OpenAI from 'openai'
 import { EventEmitter } from 'events'
+import { checkAndCompressHistory } from './lib/utils'
 
 /**
  * Classe Agent compatibile con @openai/agents per gestire conversazioni con AI e tool calls
@@ -95,6 +96,8 @@ export class Agent extends EventEmitter {
       console.log('Ultimo messaggio:', this.getLastMessage())
       console.log('Tools:', toolDefinitions.map(t => t.name).join(', '))
     }
+    this.messages = await checkAndCompressHistory(this.messages)
+
     const res = await this.openai.chat.completions.create({
       model: this.model,
       messages: this.messages,

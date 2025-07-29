@@ -39,6 +39,9 @@ export { Tool } from './Tool.js'
 // Utility functions
 export { createChatInterface } from './cli.js'
 
+export { parseJSON, checkAndCompressHistory } from './lib/utils.js'
+export { callAI } from './lib/ai-client.js'
+
 /**
  * Quick setup function for common use cases
  */
