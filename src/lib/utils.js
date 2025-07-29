@@ -18,8 +18,8 @@ export async function parseJSON(content, tryAgain = true, logger = console) {
             content = content.slice(0, -1);
         }
 
-        const start = content.indexOf('{');
-        const end = content.lastIndexOf('}');
+        const start = Math.min(content.indexOf('{'), content.indexOf('['));
+        const end = Math.max(content.lastIndexOf('}'), content.lastIndexOf(']'));
 
         logger.log('🔍 parseJSON - Posizioni JSON:', { start, end, contentLength: content.length });
 
@@ -71,14 +71,19 @@ export async function checkAndCompressHistory(history) {
     if (history.length > (process.env.MAX_HISTORY_LENGTH || 40)) {
         console.log(`🔄 Cronologia troppo lunga (${history.length} messaggi), compressione in corso...`);
         const latest = history.slice(-4);
-        const data = history.slice(0, -4).filter(m=>m.role !== 'system').slice(-(process.env.MAX_HISTORY_LENGTH || 40));
+        const data = history.slice(0, -4).filter(m => m.role !== 'system').slice(-(process.env.MAX_HISTORY_LENGTH || 40));
         const prompt = fs.readFileSync(join(__dirname, '../prompts/summarize_conversation_prompt.txt'), 'utf-8') + '\n' + JSON.stringify(data);
-        const compressed = await callAI(prompt, 0.2, process.env.COMPRESS_MODEL || 'deepseek/deepseek-chat-v3-0324:free' );
-        const parsed = await parseJSON(compressed);
-        if (!parsed || !Array.isArray(parsed)) {
-            throw new Error('La risposta compressa non è un array valido');
+        const compressed = await callAI(prompt, 0.2, process.env.COMPRESS_MODEL || 'deepseek/deepseek-chat-v3-0324:free');
+        try {
+            const parsed = await parseJSON(compressed, true);
+            if (!parsed || typeof parsed !== 'object') {
+                throw new Error('La risposta compressa non è un oggetto JSON valido');
+            }
+            return [...parsed, ...latest];
+        } catch (error) {
+            console.error('❌ Errore nel parsing della risposta compressa:', error.message);
+            return history.slice(0, -4).filter(m => m.role !== 'system').slice(-(process.env.MAX_HISTORY_LENGTH || 40))
         }
-        return [...parsed, ...latest];
     }
     return history;
 }
