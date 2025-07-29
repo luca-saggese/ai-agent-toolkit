@@ -71,12 +71,12 @@ export class Tool {
   /**
    * Esegue il tool con gli argomenti forniti
    */
-  async execute(args) {
+  async execute(args, session) {
     // Validazione con schema Zod se disponibile
     if (this.schema) {
       try {
         const validatedArgs = this.schema.parse(args)
-        return await this.handler(validatedArgs)
+        return await this.handler(validatedArgs, session)
       } catch (error) {
         throw new Error(`Validation error: ${error.message}`)
       }
