@@ -83,7 +83,7 @@ export class Tool {
       }
     }
     
-    return await this.handler(args)
+    return await this.handler(args, session)
   }
 
   /**
