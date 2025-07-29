@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import OpenAI from 'openai'
 import { EventEmitter } from 'events'
-import { checkAndCompressHistory } from './lib/utils'
+import { checkAndCompressHistory } from './lib/utils.js'
 
 /**
  * Classe Agent compatibile con @openai/agents per gestire conversazioni con AI e tool calls
