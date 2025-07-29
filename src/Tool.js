@@ -76,6 +76,7 @@ export class Tool {
     if (this.schema) {
       try {
         const validatedArgs = this.schema.parse(args)
+
         return await this.handler(validatedArgs, session)
       } catch (error) {
         throw new Error(`Validation error: ${error.message}`)
@@ -88,7 +89,7 @@ export class Tool {
   /**
    * Alias per compatibilità con @openai/agents
    */
-  async run(args) {
-    return await this.execute(args)
+  async run(args, session) {
+    return await this.execute(args, session)
   }
 }
