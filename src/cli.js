@@ -18,14 +18,16 @@ export function createChatInterface(agent, options = {}) {
     historyFile = null
   } = options
 
-  if (historyFile && !fs.existsSync(historyFile)) {
+  if (historyFile && fs.existsSync(historyFile)) {
     try {
-      agent.setHistory(fs.readFileSync(historyFile, 'utf8'))
+      agent.setHistory(JSON,parse(fs.readFileSync(historyFile, 'utf8')))
       console.log(`\n📜 Cronologia caricata da ${historyFile}`)
     } catch (error) {
       console.error(`\n❌ Errore nel caricamento della cronologia: ${error.message}`)
       return
     }
+  }else if (historyFile) {
+    console.log(`\n📜 Cronologia non trovata, ne verrà creata una nuova in ${historyFile}`)
   }
 
   const rl = readline.createInterface({
