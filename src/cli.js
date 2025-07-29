@@ -20,7 +20,7 @@ export function createChatInterface(agent, options = {}) {
 
   if (historyFile && fs.existsSync(historyFile)) {
     try {
-      agent.setHistory(JSON,parse(fs.readFileSync(historyFile, 'utf8')))
+      agent.setHistory(JSON.parse(fs.readFileSync(historyFile, 'utf8')))
       console.log(`\n📜 Cronologia caricata da ${historyFile}`)
     } catch (error) {
       console.error(`\n❌ Errore nel caricamento della cronologia: ${error.message}`)

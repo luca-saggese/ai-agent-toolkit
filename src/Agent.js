@@ -90,7 +90,11 @@ export class Agent extends EventEmitter {
    */
   async step() {
     const toolDefinitions = this.getToolDefinitions()
-
+    if (this.verbose) {
+      console.log('Esecuzione step con', this.messages.length, 'messaggi e', toolDefinitions.length, 'tools')
+      console.log('Ultimo messaggio:', this.getLastMessage())
+      console.log('Tools:', toolDefinitions.map(t => t.name).join(', '))
+    }
     const res = await this.openai.chat.completions.create({
       model: this.model,
       messages: this.messages,
