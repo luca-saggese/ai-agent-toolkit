@@ -97,26 +97,32 @@ export function createChatInterface(agent, options = {}) {
     console.log('  • /help            - Mostra questo aiuto')
   }
 
+  let isRunning = false;
+
   // Main input handler
   async function handleInput(input) {
-
+    if (isRunning) {
+      console.log('\n⏳ Attendi che la risposta precedente sia completata...');
+      return;
+    }
     if (handleSpecialCommands(input)) {
-      return
+      return;
     }
-
     if (input.trim() === '') {
-      return
+      return;
     }
-
     try {
-      const result = await agent.run(input)
-      console.log(`\n🤖 ${assistantName}: ${result.content}`)
+      isRunning = true;
+      const result = await agent.run(input);
+      console.log(`\n🤖 ${assistantName}: ${result.content}`);
       if (historyFile) {
-        saveHistory(agent, historyFile)
-        console.log(`\n💾 Cronologia salvata in ${historyFile}`)
+        saveHistory(agent, historyFile);
+        console.log(`\n💾 Cronologia salvata in ${historyFile}`);
       }
     } catch (error) {
-      console.error('\n❌ Errore:', error.message)
+      console.error('\n❌ Errore:', error.message);
+    } finally {
+      isRunning = false;
     }
   }
 

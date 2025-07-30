@@ -8,7 +8,7 @@ const __dirname = dirname(__filename);
 
 export async function parseJSON(content, tryAgain = true, logger = console) {
 
-    logger.log('🔍 parseJSON - Contenuto ricevuto (primi 200 caratteri):', content.substring(0, 200));
+    //logger.log('🔍 parseJSON - Contenuto ricevuto (primi 200 caratteri):', content.substring(0, 200));
 
     try {
         // Tenta di trovare il primo blocco JSON valido
@@ -28,7 +28,7 @@ export async function parseJSON(content, tryAgain = true, logger = console) {
         const endMatch = [...content.matchAll(/[\}\]]/g)].pop();
         const end = endMatch ? endMatch.index : -1;
 
-        logger.log('🔍 parseJSON - Posizioni JSON:', { start, end, contentLength: content.length });
+        //logger.log('🔍 parseJSON - Posizioni JSON:', { start, end, contentLength: content.length });
 
         if (start === -1 || end === -1) {
             console.error('❌ Nessun blocco JSON trovato nel contenuto');
@@ -37,7 +37,7 @@ export async function parseJSON(content, tryAgain = true, logger = console) {
         }
 
         let jsonString = content.substring(start, end + 1);
-        logger.log('🔍 parseJSON - JSON estratto (primi 200 caratteri):', jsonString.substring(0, 200));
+        //logger.log('🔍 parseJSON - JSON estratto (primi 200 caratteri):', jsonString.substring(0, 200));
 
         // Escape virgolette interne per evitare crash
         jsonString = jsonString.replace(/:\s*"([^"]*?)"(?=\s*,|\s*})/g, (match, group) => {
@@ -47,7 +47,7 @@ export async function parseJSON(content, tryAgain = true, logger = console) {
 
         try {
             const parsed = JSON.parse(jsonString);
-            logger.log('✅ parseJSON - JSON parsato con successo');
+            //logger.log('✅ parseJSON - JSON parsato con successo');
             return parsed;
         } catch (error) {
             if (!tryAgain) {
