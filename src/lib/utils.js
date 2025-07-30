@@ -64,7 +64,7 @@ export async function parseJSON(content, tryAgain = true, logger = console) {
             return parseJSON(corrected, false); // Riprova senza ulteriori tentativi
         }
     } catch (e) {
-        console.error('❌ Errore fatale nel parsing JSON:', e.message);
+        console.error('❌ Errore fatale nel parsing JSON:',e);
         logger.log('📄 Contenuto originale completo:', content);
         throw e;
     }
@@ -80,7 +80,7 @@ export async function checkAndCompressHistory(history) {
         const latest = history.slice(-4);
         const data = history.slice(0, -4).filter(m => m.role !== 'system').slice(-(process.env.MAX_HISTORY_LENGTH || 40));
         const prompt = fs.readFileSync(join(__dirname, '../prompts/summarize_conversation_prompt.txt'), 'utf-8') + '\n' + JSON.stringify(data);
-        const compressed = await callAI(prompt, 0.2, process.env.COMPRESS_MODEL || 'deepseek/deepseek-chat-v3-0324:free');
+        const compressed = await callAI(prompt, 0.2, process.env.COMPRESS_MODEL || 'google/gemma-3n-e2b-it:free');
         try {
             const parsed = await parseJSON(compressed, true);
             if (!parsed || typeof parsed !== 'object') {
@@ -88,7 +88,7 @@ export async function checkAndCompressHistory(history) {
             }
             return [...parsed, ...latest];
         } catch (error) {
-            console.error('❌ Errore nel parsing della risposta compressa:', error.message);
+            console.error('❌ Errore nel parsing della risposta compressa:', error);
             return history.slice(0, -4).filter(m => m.role !== 'system').slice(-(process.env.MAX_HISTORY_LENGTH || 40))
         }
     }
