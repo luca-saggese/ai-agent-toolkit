@@ -115,9 +115,10 @@ export function createChatInterface(agent, options = {}) {
       isRunning = true;
       const result = await agent.run(input);
       console.log(`\n🤖 ${assistantName}: ${result.content}`);
+      rl.prompt()
       if (historyFile) {
         saveHistory(agent, historyFile);
-        console.log(`\n💾 Cronologia salvata in ${historyFile}`);
+       // console.log(`\n💾 Cronologia salvata in ${historyFile}`);
       }
     } catch (error) {
       console.error('\n❌ Errore:', error.message);
@@ -129,7 +130,7 @@ export function createChatInterface(agent, options = {}) {
   // Event listeners
   rl.on('line', async (input) => {
     await handleInput(input)
-    rl.prompt()
+    
   })
 
   rl.on('close', () => {
