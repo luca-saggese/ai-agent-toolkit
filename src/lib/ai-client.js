@@ -5,26 +5,34 @@ export async function callAI(prompt, temperature = 0.7, model = process.env.MODE
         apiKey: process.env.OPENROUTER_API_KEY,
         baseURL: 'https://openrouter.ai/api/v1',
     })
-    try {
-        const res = await openai.chat.completions.create({
-            model,
-            prompt: `${systemPrompt}\n\nUser: ${prompt}`,
-            temperature: temperature
-        })
-        if(res.error) {
-            throw new Error(`OpenAI API error: ${res.error.message}`);
+    let lastError;
+    for (let attempt = 1; attempt <= retry; attempt++) {
+        try {
+            const res = await openai.chat.completions.create({
+                model,
+                prompt: `${systemPrompt}\n\nUser: ${prompt}`,
+                temperature: temperature
+            })
+            if(res.error) {
+                throw new Error(`OpenAI API error: ${res.error.message}`);
+            }
+            const {usage} = res;
+            console.log('Usage:', usage);
+            const msg = res.choices[0].text.trim();
+            if (!msg) {
+                throw new Error('Risposta vuota dal modello');
+            }
+            return msg
+        } catch (error) {
+            lastError = error;
+            if (error.response && error.response.data) {
+                console.error('API error response:', error.response.data);
+            }
+            console.error(`Tentativo ${attempt} fallito:`, error.message);
+            if (attempt < retry) {
+                await new Promise(r => setTimeout(r, 500 * attempt));
+            }
         }
-        //console.log('AI response:', res);
-        const {usage} = res;
-        console.log('Usage:', usage);
-        const msg = res.choices[0].text.trim();
-        return msg
-    } catch (error) {
-        // Mostra il body della risposta se disponibile (es. 400)
-        if (error.response && error.response.data) {
-            console.error('API error response:', error.response.data);
-        }
-        console.error(error);
-        throw error;
     }
+    throw lastError;
 }
