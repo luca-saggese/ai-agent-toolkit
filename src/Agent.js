@@ -188,7 +188,7 @@ export class Agent extends EventEmitter {
           continue
         }
 
-        console.log(`⚡ Eseguendo tool: ${name}...`, args)
+        console.log(`⚡ Eseguendo tool: ${name}(${JSON.stringify(args)})`)
         const startTime = Date.now()
         const result = await tool.execute(args, this.session)
 

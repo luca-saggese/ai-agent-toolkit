@@ -20,8 +20,14 @@ export async function parseJSON(content, tryAgain = true, logger = console) {
 
 
 
-        const start = content.indexOf(/[\{\[]/)
-        const end = content.lastIndexOf(/[\}\]]/)
+        // Trova la posizione del primo '{' o '['
+        const startMatch = content.match(/[\{\[]/);
+        const start = startMatch ? startMatch.index : -1;
+
+        // Trova la posizione dell'ultimo '}' o ']'
+        const endMatch = [...content.matchAll(/[\}\]]/g)].pop();
+        const end = endMatch ? endMatch.index : -1;
+
         logger.log('🔍 parseJSON - Posizioni JSON:', { start, end, contentLength: content.length });
 
         if (start === -1 || end === -1) {

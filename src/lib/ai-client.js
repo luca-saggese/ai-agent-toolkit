@@ -14,6 +14,9 @@ export async function callAI(prompt, temperature = 0.7, model = process.env.MODE
         if(res.error) {
             throw new Error(`OpenAI API error: ${res.error.message}`);
         }
+        //console.log('AI response:', res);
+        const {usage} = res;
+        console.log('Usage:', usage);
         const msg = res.choices[0].text.trim();
         return msg
     } catch (error) {
