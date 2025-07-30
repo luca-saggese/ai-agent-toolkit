@@ -165,7 +165,8 @@ export class Agent extends EventEmitter {
       const { name, arguments: argsStr } = toolCall.function
 
       try {
-        const args = JSON.parse(argsStr)
+        console.log(`🔧 Esecuzione tool: ${name} con args:`, argsStr)
+        const args = argsStr.trim() ? JSON.parse(argsStr.trim()) : {}  
         const tool = this.toolMap.get(name)
 
         if (!tool) {
@@ -187,7 +188,7 @@ export class Agent extends EventEmitter {
           continue
         }
 
-        console.log(`⚡ Eseguendo tool: ${name}...`)
+        console.log(`⚡ Eseguendo tool: ${name}...`, args)
         const startTime = Date.now()
         const result = await tool.execute(args, this.session)
 
@@ -217,6 +218,7 @@ export class Agent extends EventEmitter {
       } catch (error) {
         const errorMsg = `Errore nell'esecuzione di ${name}: ${error.message}`
         console.log(`❌ Tool Error: ${errorMsg}`)
+        console.log(error)
 
         const toolMessage = {
           role: 'tool',
