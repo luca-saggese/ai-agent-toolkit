@@ -98,6 +98,8 @@ export class Agent extends EventEmitter {
     }
     this.messages = await checkAndCompressHistory(this.messages)
 
+    this.messages.push({ role: 'system', content: this.systemPrompt })
+
     const res = await this.openai.chat.completions.create({
       model: this.model,
       messages: this.messages,
