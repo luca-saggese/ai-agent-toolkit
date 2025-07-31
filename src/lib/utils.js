@@ -47,6 +47,13 @@ export async function parseJSON(content, tryAgain = true, logger = console) {
 
         try {
             const parsed = JSON.parse(jsonString);
+            Object.keys(parsed).forEach((key) => {
+                if (key.indexOf('.') > -1) {
+                    const newKey = key.replace(/\./g, '_');
+                    parsed[newKey] = parsed[key];
+                    delete parsed[key];
+                }
+            });
             //logger.log('✅ parseJSON - JSON parsato con successo');
             return parsed;
         } catch (error) {
@@ -64,7 +71,7 @@ export async function parseJSON(content, tryAgain = true, logger = console) {
             return parseJSON(corrected, false); // Riprova senza ulteriori tentativi
         }
     } catch (e) {
-        console.error('❌ Errore fatale nel parsing JSON:',e);
+        console.error('❌ Errore fatale nel parsing JSON:', e);
         logger.log('📄 Contenuto originale completo:', content);
         throw e;
     }
@@ -77,7 +84,7 @@ export async function checkAndCompressHistory(history) {
 
     if (history.length > (process.env.MAX_HISTORY_LENGTH || 40)) {
         console.log(`🔄 Cronologia troppo lunga (${history.length} messaggi), compressione in corso...`);
-        
+
         const systemMessage = history.find(m => m.role === 'system');
         const data = history.filter(m => m.role !== 'system').slice(-10);
         return [systemMessage, ...data];
