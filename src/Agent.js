@@ -165,7 +165,6 @@ export class Agent extends EventEmitter {
       const { name, arguments: argsStr } = toolCall.function
 
       try {
-        console.log(`🔧 Esecuzione tool: ${name} con args:`, argsStr)
         const args = argsStr.trim() ? JSON.parse(argsStr.trim()) : {}  
         const tool = this.toolMap.get(name)
 
