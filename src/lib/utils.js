@@ -77,20 +77,25 @@ export async function checkAndCompressHistory(history) {
 
     if (history.length > (process.env.MAX_HISTORY_LENGTH || 40)) {
         console.log(`🔄 Cronologia troppo lunga (${history.length} messaggi), compressione in corso...`);
-        const latest = history.slice(-4);
-        const data = history.slice(0, -4).filter(m => m.role !== 'system').slice(-(process.env.MAX_HISTORY_LENGTH || 40));
-        const prompt = fs.readFileSync(join(__dirname, '../prompts/summarize_conversation_prompt.txt'), 'utf-8') + '\n' + JSON.stringify(data);
-        const compressed = await callAI(prompt, 0.2, process.env.COMPRESS_MODEL || 'google/gemma-3n-e2b-it:free');
-        try {
-            const parsed = await parseJSON(compressed, true);
-            if (!parsed || typeof parsed !== 'object') {
-                throw new Error('La risposta compressa non è un oggetto JSON valido');
-            }
-            return [...parsed, ...latest];
-        } catch (error) {
-            console.error('❌ Errore nel parsing della risposta compressa:', error);
-            return history.slice(0, -4).filter(m => m.role !== 'system').slice(-(process.env.MAX_HISTORY_LENGTH || 40))
-        }
+        
+        const systemMessage = history.find(m => m.role === 'system');
+        const data = history.filter(m => m.role !== 'system').slice(-10);
+        return [systemMessage, ...data];
+
+        //const latest = history.slice(-4);
+        //  const data = history.slice(0, -4).filter(m => m.role !== 'system').slice(-(process.env.MAX_HISTORY_LENGTH || 40));
+        // const prompt = fs.readFileSync(join(__dirname, '../prompts/summarize_conversation_prompt.txt'), 'utf-8') + '\n' + JSON.stringify(data);
+        // const compressed = await callAI(prompt, 0.2, process.env.COMPRESS_MODEL || 'google/gemma-3n-e2b-it:free');
+        // try {
+        //     const parsed = await parseJSON(compressed, true);
+        //     if (!parsed || typeof parsed !== 'object') {
+        //         throw new Error('La risposta compressa non è un oggetto JSON valido');
+        //     }
+        //     return [...parsed, ...latest];
+        // } catch (error) {
+        //     console.error('❌ Errore nel parsing della risposta compressa:', error);
+        //     return history.slice(0, -4).filter(m => m.role !== 'system').slice(-(process.env.MAX_HISTORY_LENGTH || 40))
+        // }
     }
     return history;
 }
