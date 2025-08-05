@@ -28,7 +28,9 @@ export class Agent extends EventEmitter {
         baseURL: options.baseURL || 'https://openrouter.ai/api/v1',
       })
       this.model = options.model || 'qwen/qwen3-coder:free'
-      this.systemPrompt = (options.instructions || options.systemPrompt || '') + `\n\nALWAYS CALL ONLY 1 tool at a time.\n`
+      this.systemPrompt = (options.instructions || options.systemPrompt || '') +
+        `\n\nALWAYS CALL ONLY 1 tool at a time.\n` +
+        `If you need to stop and ask for user input, reply with "STOP".`
       this.tools = options.tools || []
       this.session = options.session || null // Aggiunto per supportare sessioni
     }
@@ -115,6 +117,19 @@ export class Agent extends EventEmitter {
     }
 
     if (!msg.tool_calls) {
+      // Gestione della keyword STOP
+      if (typeof msg.content === 'string' && msg.content.trim().toUpperCase() === 'STOP') {
+        if (this.verbose) {
+          console.log('🛑 Ricevuto STOP dall\'assistant, terminazione forzata.')
+        }
+        this.messages.push(msg)
+        this._emitMessage(msg, 'assistant_message')
+        return {
+          type: 'stop',
+          content: msg.content,
+          role: 'assistant'
+        }
+      }
       // Risposta finale
       this.messages.push(msg)
 
@@ -269,6 +284,25 @@ export class Agent extends EventEmitter {
 
       const result = await this.step()
 
+      if (result.type === 'stop') {
+        if (this.verbose) {
+          console.log('─'.repeat(60))
+          console.log(`🛑 Conversazione terminata con STOP in ${iterations} iterazione${iterations > 1 ? 'i' : ''}`)
+        }
+        this.emit('complete', {
+          content: result.content,
+          role: result.role,
+          iterations,
+          messages: this.getHistory()
+        })
+        return {
+          content: result.content,
+          role: result.role,
+          iterations,
+          messages: this.getHistory()
+        }
+      }
+
       if (result.type === 'response') {
         if (this.verbose) {
           console.log('─'.repeat(60))
@@ -322,6 +356,19 @@ export class Agent extends EventEmitter {
       }
 
       const result = await this.step()
+
+      if (result.type === 'stop') {
+        if (this.verbose) {
+          console.log('─'.repeat(60))
+          console.log(`🛑 Conversazione terminata con STOP in ${iterations} iterazione${iterations > 1 ? 'i' : ''}`)
+        }
+        return {
+          content: result.content,
+          role: result.role,
+          iterations,
+          messages: this.getHistory()
+        }
+      }
 
       if (result.type === 'response') {
         if (this.verbose) {

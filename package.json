@@ -1,6 +1,6 @@
 {
   "name": "@lvx74/openrrouter-ai-agent",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "A powerful AI agent toolkit compatible with @openai/agents for building conversational AI with tool calling support using OpenRouter",
   "type": "module",
   "main": "src/index.js",
