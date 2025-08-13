@@ -98,6 +98,9 @@ export class Agent extends EventEmitter {
       console.log('Ultimo messaggio:', this.getLastMessage())
       console.log('Tools:', toolDefinitions.map(t => t.name).join(', '))
     }
+    if( this.handleMessagesHistory) {
+      this.messages = await this.handleMessagesHistory(this.messages, toolDefinitions) || this.messages;
+    }
     this.messages = await checkAndCompressHistory(this.messages)
 
     const res = await this.openai.chat.completions.create({

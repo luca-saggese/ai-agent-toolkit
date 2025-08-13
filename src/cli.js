@@ -26,7 +26,7 @@ export function createChatInterface(agent, options = {}) {
       console.error(`\n❌ Errore nel caricamento della cronologia: ${error.message}`)
       return
     }
-  }else if (historyFile) {
+  } else if (historyFile) {
     console.log(`\n📜 Cronologia non trovata, ne verrà creata una nuova in ${historyFile}`)
   }
 
@@ -100,6 +100,7 @@ export function createChatInterface(agent, options = {}) {
   let isRunning = false;
 
   // Main input handler
+  let tryCount = 0;
   async function handleInput(input) {
     if (isRunning) {
       console.log('\n⏳ Attendi che la risposta precedente sia completata...');
@@ -115,13 +116,15 @@ export function createChatInterface(agent, options = {}) {
       isRunning = true;
       const result = await agent.run(input);
       console.log(`\n🤖 ${assistantName}: ${result.content}`);
+      tryCount = 0
       rl.prompt()
       if (historyFile) {
         saveHistory(agent, historyFile);
-       // console.log(`\n💾 Cronologia salvata in ${historyFile}`);
+        // console.log(`\n💾 Cronologia salvata in ${historyFile}`);
       }
     } catch (error) {
-      console.error('\n❌ Errore:', error.message);
+      console.error('\n❌ Errore:', error.message, 'retry count:', tryCount);
+      if (tryCount++ < 10) handleInput('riprova');
     } finally {
       isRunning = false;
     }
@@ -130,7 +133,7 @@ export function createChatInterface(agent, options = {}) {
   // Event listeners
   rl.on('line', async (input) => {
     await handleInput(input)
-    
+
   })
 
   rl.on('close', () => {
