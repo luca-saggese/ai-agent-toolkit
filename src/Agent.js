@@ -121,10 +121,11 @@ export class Agent extends EventEmitter {
 
     if (!msg.tool_calls) {
       // Gestione della keyword STOP
-      if (typeof msg.content === 'string' && msg.content.trim().toUpperCase() === 'STOP') {
+      if (typeof msg.content === 'string' && msg.content.trim().endsWith('STOP')) {
         if (this.verbose) {
           console.log('🛑 Ricevuto STOP dall\'assistant, terminazione forzata.')
         }
+        msg.content = msg.content.trim().replace(/STOP$/, '')
         this.messages.push(msg)
         this._emitMessage(msg, 'assistant_message')
         return {
@@ -373,18 +374,20 @@ export class Agent extends EventEmitter {
         }
       }
 
+
       if (result.type === 'response') {
         if (this.verbose) {
           console.log('─'.repeat(60))
           console.log(`✅ Elaborazione completata in ${iterations} iterazione${iterations > 1 ? 'i' : ''}`)
         }
-
-        return {
-          content: result.content,
-          role: result.role,
-          iterations,
-          messages: this.getHistory()
-        }
+//console.log(result.content)
+        // return {
+        //   content: result.content,
+        //   role: result.role,
+        //   iterations,
+        //   messages: this.getHistory()
+        // }
+        this.addUserMessage('continua')
       }
 
       // Se ci sono stati tool calls, continua il loop
