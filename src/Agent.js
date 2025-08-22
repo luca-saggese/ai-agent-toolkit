@@ -123,7 +123,9 @@ export class Agent extends EventEmitter {
 
     if (!msg.tool_calls) {
       // Gestione della keyword STOP
-      if (typeof msg.content === 'string' && msg.content.trim().endsWith('STOP')) {
+      if (typeof msg.content === 'string' &&
+         (msg.content.trim().indexOf('STOP')>-1 || msg.content.trim().endsWith('?'))
+        ) {
         if (this.verbose) {
           console.log('🛑 Ricevuto STOP dall\'assistant, terminazione forzata.')
         }

@@ -124,6 +124,7 @@ export function createChatInterface(agent, options = {}) {
         // console.log(`\n💾 Cronologia salvata in ${historyFile}`);
       }
     } catch (error) {
+      isRunning = false
       console.error('\n❌ Errore:', error.message, 'retry count:', tryCount);
       if (tryCount++ < 10) handleInput('riprova');
     } finally {
