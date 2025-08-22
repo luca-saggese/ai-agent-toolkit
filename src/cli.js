@@ -17,6 +17,7 @@ export function createChatInterface(agent, options = {}) {
     assistantName = 'Assistant',
     historyFile = null
   } = options
+  agent.on('assistant_message', (message) =>  console.log(`\n🤖 ${assistantName}: ${message.content}`));
 
   if (historyFile && fs.existsSync(historyFile)) {
     try {
@@ -115,7 +116,7 @@ export function createChatInterface(agent, options = {}) {
     try {
       isRunning = true;
       const result = await agent.run(input);
-      console.log(`\n🤖 ${assistantName}: ${result.content}`);
+      //console.log(`\n🤖 ${assistantName}: ${result.content}`);
       tryCount = 0
       rl.prompt()
       if (historyFile) {

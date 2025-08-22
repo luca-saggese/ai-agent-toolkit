@@ -10,6 +10,8 @@ import { checkAndCompressHistory } from './lib/utils.js'
 export class Agent extends EventEmitter {
   constructor(options = {}) {
     super() // Inizializza EventEmitter
+    this.run = this.run.bind(this)
+
 
     // Supporto per sia il formato nuovo che quello vecchio
     if (typeof options === 'string') {
@@ -98,7 +100,7 @@ export class Agent extends EventEmitter {
       console.log('Ultimo messaggio:', this.getLastMessage())
       console.log('Tools:', toolDefinitions.map(t => t.name).join(', '))
     }
-    if( this.handleMessagesHistory) {
+    if (this.handleMessagesHistory) {
       this.messages = await this.handleMessagesHistory(this.messages, toolDefinitions) || this.messages;
     }
     this.messages = await checkAndCompressHistory(this.messages)
@@ -125,7 +127,7 @@ export class Agent extends EventEmitter {
         if (this.verbose) {
           console.log('🛑 Ricevuto STOP dall\'assistant, terminazione forzata.')
         }
-        msg.content = msg.content.trim().replace(/STOP$/, '')
+       // msg.content = msg.content.trim().replace(/STOP$/, '')
         this.messages.push(msg)
         this._emitMessage(msg, 'assistant_message')
         return {
@@ -184,7 +186,7 @@ export class Agent extends EventEmitter {
       const { name, arguments: argsStr } = toolCall.function
 
       try {
-        const args = argsStr.trim() ? JSON.parse(argsStr.trim()) : {}  
+        const args = argsStr.trim() ? JSON.parse(argsStr.trim()) : {}
         const tool = this.toolMap.get(name)
 
         if (!tool) {
@@ -344,6 +346,7 @@ export class Agent extends EventEmitter {
    * Processa un messaggio utente completo con tutti i tool calls necessari
    */
   async run(userMessage) {
+    this.isRunning = true
     if (this.verbose) {
       console.log('🚀 Iniziando elaborazione...')
       console.log(`📝 User Input: "${userMessage}"`)
@@ -366,6 +369,7 @@ export class Agent extends EventEmitter {
           console.log('─'.repeat(60))
           console.log(`🛑 Conversazione terminata con STOP in ${iterations} iterazione${iterations > 1 ? 'i' : ''}`)
         }
+        this.isRunning = false
         return {
           content: result.content,
           role: result.role,
@@ -380,7 +384,7 @@ export class Agent extends EventEmitter {
           console.log('─'.repeat(60))
           console.log(`✅ Elaborazione completata in ${iterations} iterazione${iterations > 1 ? 'i' : ''}`)
         }
-//console.log(result.content)
+        //console.log(result.content)
         // return {
         //   content: result.content,
         //   role: result.role,
@@ -395,7 +399,7 @@ export class Agent extends EventEmitter {
         console.log('↻ Continuando con la prossima iterazione...')
       }
     }
-
+    this.isRunning = false
     throw new Error(`Raggiunto il limite massimo di iterazioni (${this.maxIterations})`)
   }
 
