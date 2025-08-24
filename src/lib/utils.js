@@ -86,7 +86,7 @@ export async function checkAndCompressHistory(history) {
         console.log(`🔄 Cronologia troppo lunga (${history.length} messaggi), compressione in corso...`);
 
         const systemMessage = history.find(m => m.role === 'system');
-        const data = history.filter(m => m.role !== 'system').slice(-10);
+        const data = history.filter(m => m.role !== 'system').slice(-(process.env.MAX_HISTORY_LENGTH || 40));
         return [systemMessage, ...data];
 
         //const latest = history.slice(-4);
