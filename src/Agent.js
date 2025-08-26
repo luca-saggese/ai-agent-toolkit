@@ -2,7 +2,7 @@ import 'dotenv/config'
 import OpenAI from 'openai'
 import { EventEmitter } from 'events'
 import { checkAndCompressHistory } from './lib/utils.js'
-import { finalAnswerTool } from './lib/functions.js'
+
 /**
  * Classe Agent compatibile con @openai/agents per gestire conversazioni con AI e tool calls
  * Supporta eventi per streaming di tutti i messaggi (user, assistant, tool, tool_calls)
@@ -10,8 +10,6 @@ import { finalAnswerTool } from './lib/functions.js'
 export class Agent extends EventEmitter {
   constructor(options = {}) {
     super() // Inizializza EventEmitter
-    this.run = this.run.bind(this)
-
 
     // Supporto per sia il formato nuovo che quello vecchio
     if (typeof options === 'string') {
@@ -30,22 +28,12 @@ export class Agent extends EventEmitter {
         baseURL: options.baseURL || 'https://openrouter.ai/api/v1',
       })
       this.model = options.model || 'qwen/qwen3-coder:free'
-      this.systemPrompt = (options.instructions || options.systemPrompt || '') +
-        `\n\nALWAYS CALL ONLY 1 tool at a time.\n` +
-        `If you need to stop and ask for user input, reply with "STOP".\n` +
-        `**NON rispondere direttamente all'utente.** Pensa passo dopo passo.\n` +
-        `**Quando hai terminato il tuo lavoro e hai la risposta definitiva, DEVI usare il tool 'final_answer' per comunicare il risultato.** Questo è l'UNICO modo per terminare il tuo compito.`
+      this.systemPrompt = (options.instructions || options.systemPrompt || '') + `\n\nALWAYS CALL ONLY 1 tool at a time.\n`
       this.tools = options.tools || []
       this.session = options.session || null // Aggiunto per supportare sessioni
     }
 
     this.messages = options.messages || []
-
-    // controlla se trai i tools c'e' il final_answer e se non c'e' aggiungilo
-    if (!this.tools.find(t => t.name === 'final_answer')) {
-      this.tools.push(finalAnswerTool)
-    }
-
 
     // Mappa dei tools per accesso rapido
     this.toolMap = new Map()
@@ -98,34 +86,6 @@ export class Agent extends EventEmitter {
     return this.tools.map(tool => tool.getDefinition())
   }
 
-  // Aggiungi una funzione helper da qualche parte, magari fuori dalla classe
-  // o come metodo privato `_isConversationalFiller`
-  isFinalAnswer(content) {
-    if (!content || typeof content !== 'string') {
-      return false;
-    }
-    const lowerContent = content.toLowerCase().trim();
-
-    // Lista di frasi "inutili" che vogliamo ignorare
-    const fillerPatterns = [
-      'sto elaborando',
-      'sto lavorando',
-      'un attimo',
-      'certo, procedo',
-      'ho capito',
-      'sto cercando'
-    ];
-
-    // Se la risposta è molto breve o contiene uno dei pattern,
-    // probabilmente non è la risposta finale.
-    if (lowerContent.length < 25 && fillerPatterns.some(p => lowerContent.includes(p))) {
-      return false;
-    }
-
-    // Altrimenti, la consideriamo una potenziale risposta finale
-    return true;
-  }
-
   /**
    * Esegue una singola iterazione della conversazione
    */
@@ -133,27 +93,27 @@ export class Agent extends EventEmitter {
     const toolDefinitions = this.getToolDefinitions()
     if (this.verbose) {
       console.log('Esecuzione step con', this.messages.length, 'messaggi e', toolDefinitions.length, 'tools')
-      const lastMessage = this.getLastMessage()
-      console.log('Ultimo messaggio:', lastMessage)
+      console.log('Ultimo messaggio:', this.getLastMessage())
       console.log('Tools:', toolDefinitions.map(t => t.name).join(', '))
     }
-    if (this.handleMessagesHistory) {
-      this.messages = await this.handleMessagesHistory(this.messages, toolDefinitions) || this.messages;
-    }
     this.messages = await checkAndCompressHistory(this.messages)
-
-    // ensure the system message is always present
-    if (!this.messages.find(m => m.role === 'system') && this.systemPrompt) {
-      this.messages.unshift({ role: 'system', content: this.systemPrompt })
+    let res = null;
+    const tryCount = 0;
+    while (tryCount < 10 && !res) {
+      try {
+        res = await this.openai.chat.completions.create({
+          model: this.model,
+          messages: this.messages,
+          tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
+          tool_choice: toolDefinitions.length > 0 ? 'auto' : undefined,
+          temperature: this.temperature
+        })
+      } catch (error) {
+        console.error('Errore OpenAI API, retrying...', tryCount, error.message);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
 
-    const res = await this.openai.chat.completions.create({
-      model: this.model,
-      messages: this.messages,
-      tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
-      tool_choice: toolDefinitions.length > 0 ? 'auto' : undefined,
-      temperature: this.temperature
-    })
     if (res.error) {
       throw new Error(`OpenAI API Error: ${res.error || 'Unknown error'}`)
     }
@@ -164,22 +124,6 @@ export class Agent extends EventEmitter {
     }
 
     if (!msg.tool_calls) {
-      // Gestione della keyword STOP
-      if (typeof msg.content === 'string' &&
-        (msg.content.trim().indexOf('STOP') > -1 || msg.content.trim().endsWith('?'))
-      ) {
-        if (this.verbose) {
-          console.log('🛑 Ricevuto STOP dall\'assistant, terminazione forzata.')
-        }
-        // msg.content = msg.content.trim().replace(/STOP$/, '')
-        this.messages.push(msg)
-        this._emitMessage(msg, 'assistant_message')
-        return {
-          type: 'stop',
-          content: msg.content,
-          role: 'assistant'
-        }
-      }
       // Risposta finale
       this.messages.push(msg)
 
@@ -230,6 +174,7 @@ export class Agent extends EventEmitter {
       const { name, arguments: argsStr } = toolCall.function
 
       try {
+        //console.log(`🔧 Esecuzione tool: ${name} con args:`, argsStr)
         const args = argsStr.trim() ? JSON.parse(argsStr.trim()) : {}
         const tool = this.toolMap.get(name)
 
@@ -334,25 +279,6 @@ export class Agent extends EventEmitter {
 
       const result = await this.step()
 
-      if (result.type === 'stop') {
-        if (this.verbose) {
-          console.log('─'.repeat(60))
-          console.log(`🛑 Conversazione terminata con STOP in ${iterations} iterazione${iterations > 1 ? 'i' : ''}`)
-        }
-        this.emit('complete', {
-          content: result.content,
-          role: result.role,
-          iterations,
-          messages: this.getHistory()
-        })
-        return {
-          content: result.content,
-          role: result.role,
-          iterations,
-          messages: this.getHistory()
-        }
-      }
-
       if (result.type === 'response') {
         if (this.verbose) {
           console.log('─'.repeat(60))
@@ -390,7 +316,6 @@ export class Agent extends EventEmitter {
    * Processa un messaggio utente completo con tutti i tool calls necessari
    */
   async run(userMessage) {
-    this.isRunning = true
     if (this.verbose) {
       console.log('🚀 Iniziando elaborazione...')
       console.log(`📝 User Input: "${userMessage}"`)
@@ -408,12 +333,12 @@ export class Agent extends EventEmitter {
 
       const result = await this.step()
 
-      if (result.type === 'stop') {
+      if (result.type === 'response') {
         if (this.verbose) {
           console.log('─'.repeat(60))
-          console.log(`🛑 Conversazione terminata con STOP in ${iterations} iterazione${iterations > 1 ? 'i' : ''}`)
+          console.log(`✅ Elaborazione completata in ${iterations} iterazione${iterations > 1 ? 'i' : ''}`)
         }
-        this.isRunning = false
+
         return {
           content: result.content,
           role: result.role,
@@ -422,72 +347,12 @@ export class Agent extends EventEmitter {
         }
       }
 
-      // Controlla se tra i tool chiamati c'era 'final_answer'
-      if (result.type === 'tool_calls' && result.tool_calls) {
-        const finalAnswerCall = result.tool_calls.find(call => call.function.name === 'final_answer');
-
-        if (finalAnswerCall) {
-          if (this.verbose) {
-            console.log('─'.repeat(60));
-            console.log(`✅ Trovata chiamata a final_answer. Elaborazione completata.`);
-          }
-          this.isRunning = false;
-
-          // Estrai la risposta finale dai parametri del tool
-          const finalAnswerArgs = JSON.parse(finalAnswerCall.function.arguments);
-
-          return {
-            content: finalAnswerArgs.answer, // <-- La risposta finale!
-            role: 'assistant',
-            iterations,
-            messages: this.getHistory()
-          };
-        }
-      }
-
-      if (result.type === 'response') {
-        if (this.verbose) {
-          console.log('─'.repeat(60))
-          console.log(`✅ Elaborazione completata in ${iterations} iterazione${iterations > 1 ? 'i' : ''}`)
-        }
-        // Se l'agente risponde con testo normale, lo ignoriamo o lo consideriamo un errore.
-        if (this.verbose) {
-          console.log(`⚠️ L'agente ha risposto con testo invece di usare un tool. Ignoro e continuo.`);
-        }
-        // Rimuoviamo la risposta inutile come prima
-        this.messages.pop();
-        continue;
-
-
-        // if (!this.isFinalAnswer(result.content)) {
-        //   if (this.verbose) {
-        //     console.log(`⚠️ Risposta non finale rilevata: "${result.content}". La rimuovo e ritento.`)
-        //   }
-
-        //   // Rimuove l'ultimo messaggio dalla cronologia (la risposta inutile dell'assistente)
-        //   this.messages.pop()
-
-        //   // `continue` salta al prossimo ciclo del `while`
-        //   continue
-        // }
-        // //console.log(result.content)
-        // return {
-        //   content: result.content,
-        //   role: result.role,
-        //   iterations,
-        //   messages: this.getHistory()
-        // }
-
-      }
-
-
-
       // Se ci sono stati tool calls, continua il loop
       if (result.type === 'tool_calls' && this.verbose) {
         console.log('↻ Continuando con la prossima iterazione...')
       }
     }
-    this.isRunning = false
+
     throw new Error(`Raggiunto il limite massimo di iterazioni (${this.maxIterations})`)
   }
 
