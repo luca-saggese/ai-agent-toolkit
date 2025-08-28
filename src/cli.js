@@ -4,6 +4,27 @@
 
 import readline from 'readline'
 import fs from 'fs'
+import chalk from 'chalk'
+
+function parseMarkdownConsole(md) {
+  // Bold: **text** or __text__
+  md = md.replace(/\*\*(.*?)\*\*/g, (_, m) => chalk.bold(m));
+  md = md.replace(/__(.*?)__/g, (_, m) => chalk.bold(m));
+  // Italic: *text* or _text_
+  md = md.replace(/\*(.*?)\*/g, (_, m) => chalk.italic(m));
+  md = md.replace(/_(.*?)_/g, (_, m) => chalk.italic(m));
+  // Inline code: `code`
+  md = md.replace(/`([^`]+)`/g, (_, m) => chalk.yellow(m));
+  // Headings: #, ##, ###
+  md = md.replace(/^### (.*)$/gm, (_, m) => chalk.cyan.bold(m));
+  md = md.replace(/^## (.*)$/gm, (_, m) => chalk.green.bold(m));
+  md = md.replace(/^# (.*)$/gm, (_, m) => chalk.blue.bold(m));
+  // Lists: - or *
+  md = md.replace(/^[-*] (.*)$/gm, (_, m) => chalk.white('• ' + m));
+  // Links: [text](url)
+  md = md.replace(/\[(.*?)\]\((.*?)\)/g, (_, text, url) => chalk.underline.blue(text) + chalk.gray(' (' + url + ')'));
+  return md;
+}
 
 /**
  * Creates a complete chat interface with readline
@@ -17,7 +38,7 @@ export function createChatInterface(agent, options = {}) {
     assistantName = 'Assistant',
     historyFile = null
   } = options
-  agent.on('assistant_message', (message) =>  console.log(`\n🤖 ${assistantName}: ${message.content}`));
+  agent.on('assistant_message', (message) =>  console.log(`\n🤖 ${assistantName}: ${parseMarkdownConsole(message.content)}`));
 
   if (historyFile && fs.existsSync(historyFile)) {
     try {

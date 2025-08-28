@@ -10,8 +10,8 @@ export const finalAnswerTool = new Tool({
   schema: z.object({
     answer: z.string().describe('La risposta finale da fornire all\'utente')
   }),
-  handler: async ({ answer }) => {
-    console.log('✅ Chiamato il tool final_answer.');
+  handler: async ({ answer }, session, logger) => {
+    logger.log(answer);
     return answer;
   }
 })

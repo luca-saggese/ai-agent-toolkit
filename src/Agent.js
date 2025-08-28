@@ -279,7 +279,7 @@ export class Agent extends EventEmitter {
 
         console.log(`⚡ Eseguendo tool: ${name}(${JSON.stringify(args)})`)
         const startTime = Date.now()
-        const result = await tool.execute(args, this.session)
+        const result = await tool.execute(args, this.session, this.logger)
 
         if (this.verbose) {
           console.log(`📋 Observation (Osservazione da ${name}):`)
@@ -608,6 +608,13 @@ export class Agent extends EventEmitter {
         return `${role}: ${msg.content || '[Tool calls]'}`
       })
       .join('\n\n')
+  }
+
+  /**
+   * Logger personalizzato per i tools
+   */
+  logger = {
+    log: (msg) => this._emitMessage(msg, 'assistant_message')
   }
 
   /**

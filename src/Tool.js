@@ -71,7 +71,7 @@ export class Tool {
   /**
    * Esegue il tool con gli argomenti forniti
    */
-  async execute(args, session) {
+  async execute(args, session, logger = console) {
     // Validazione con schema Zod se disponibile
     if (this.schema) {
       try {
@@ -83,13 +83,13 @@ export class Tool {
       }
     }
     
-    return await this.handler(args, session)
+    return await this.handler(args, session, logger)
   }
 
   /**
    * Alias per compatibilità con @openai/agents
    */
-  async run(args, session) {
-    return await this.execute(args, session)
+  async run(args, session, logger = console) {
+    return await this.execute(args, session, logger)
   }
 }
