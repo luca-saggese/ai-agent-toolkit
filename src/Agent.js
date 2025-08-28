@@ -3,6 +3,7 @@ import OpenAI from 'openai'
 import { EventEmitter } from 'events'
 import { checkAndCompressHistory } from './lib/utils.js'
 import { finalAnswerTool } from './lib/functions.js'
+import { json } from 'stream/consumers'
 /**
  * Classe Agent compatibile con @openai/agents per gestire conversazioni con AI e tool calls
  * Supporta eventi per streaming di tutti i messaggi (user, assistant, tool, tool_calls)
@@ -29,12 +30,17 @@ export class Agent extends EventEmitter {
         apiKey: options.apiKey || process.env.OPENROUTER_API_KEY,
         baseURL: options.baseURL || 'https://openrouter.ai/api/v1',
       })
+      console.log({
+        apiKey: options.apiKey || process.env.OPENROUTER_API_KEY,
+        baseURL: options.baseURL || 'https://openrouter.ai/api/v1',
+      })
       this.model = options.model || 'qwen/qwen3-coder:free'
       this.systemPrompt = (options.instructions || options.systemPrompt || '') +
         `\n\nALWAYS CALL ONLY 1 tool at a time.\n` +
         `If you need to stop and ask for user input, reply with "STOP".\n` +
-        `**NON rispondere direttamente all'utente.** Pensa passo dopo passo.\n` +
-        `**Quando hai terminato il tuo lavoro e hai la risposta definitiva, DEVI usare il tool 'final_answer' per comunicare il risultato.** Questo è l'UNICO modo per terminare il tuo compito.`
+        `**NON rispondere direttamente all'utente.** Pensa passo dopo passo.\n`
+
+      if (this.useFinalAnswer) this.systemPrompt += `**Quando hai terminato il tuo lavoro e hai la risposta definitiva, DEVI usare il tool 'final_answer' per comunicare il risultato.** Questo è l'UNICO modo per terminare il tuo compito.`
       this.tools = options.tools || []
       this.session = options.session || null // Aggiunto per supportare sessioni
     }
@@ -42,7 +48,7 @@ export class Agent extends EventEmitter {
     this.messages = options.messages || []
 
     // controlla se trai i tools c'e' il final_answer e se non c'e' aggiungilo
-    if (!this.tools.find(t => t.name === 'final_answer')) {
+    if (this.useFinalAnswer && !this.tools.find(t => t.name === 'final_answer')) {
       this.tools.push(finalAnswerTool)
     }
 
@@ -148,7 +154,7 @@ export class Agent extends EventEmitter {
     }
 
     let res = null;
-    const tryCount = 0;
+    let tryCount = 0;
     while (tryCount < 10 && !res) {
       try {
         res = await this.openai.chat.completions.create({
@@ -158,12 +164,21 @@ export class Agent extends EventEmitter {
           tool_choice: toolDefinitions.length > 0 ? 'auto' : undefined,
           temperature: this.temperature
         })
+
+        if (!res.choices || res.choices.length === 0 || (!res.choices[0].message?.content && !res.choices[0].message?.tool_calls)) {
+          console.log('res', JSON.stringify(res, null, 2));
+          throw new Error('Nessuna risposta valida dal modello');
+        }
       } catch (error) {
-        console.error('Errore OpenAI API, retrying...', tryCount, error.message);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        tryCount++;
+        console.error('Errore OperRouter API, retrying...', tryCount, error.message);
+        // aumento il wait ad ogni tentativo
+        res = null;
+        const waitTime = tryCount * 1000;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
-    
+
     if (res.error) {
       throw new Error(`OpenAI API Error: ${res.error || 'Unknown error'}`)
     }
@@ -456,6 +471,16 @@ export class Agent extends EventEmitter {
       }
 
       if (result.type === 'response') {
+        if (!this.useFinalAnswer) {
+          this.isRunning = false
+          return {
+            content: result.content,
+            role: result.role,
+            iterations,
+            messages: this.getHistory()
+          }
+        }
+
         if (this.verbose) {
           console.log('─'.repeat(60))
           console.log(`✅ Elaborazione completata in ${iterations} iterazione${iterations > 1 ? 'i' : ''}`)
